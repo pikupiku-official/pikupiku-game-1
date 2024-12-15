@@ -1,6 +1,6 @@
 "use strict";
-//Hello world(あさい)
-//	你好！yometemasuka
+//	Hello world(あさい)
+//	test 2nd
 /*
 declare variables and constants
 */
