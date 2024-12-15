@@ -1,6 +1,6 @@
 "use strict";
 //Hello world(あさい)
-//	你好！yometemasuka
+//	branch test
 /*
 declare variables and constants
 */
