@@ -6,8 +6,8 @@ declare variables and constants
 */
 
 const FONT = "12px DotGothic16";	//	フォント
-const HEIGHT = 224;				//	仮想画面の高さ（ピクセル）
-const WIDTH = 256;				//	仮装画面の幅（ピクセル） 
+const HEIGHT = 224;					//	仮想画面の高さ（ピクセル）
+const WIDTH = 256;					//	仮装画面の幅（ピクセル） 
 const SCROLL = 2;
 const SMOOTH = 0;					//	小さい画像もボカさないでね！
 const TILECOLUMN = 4;				//	マップチップの行数
@@ -17,36 +17,36 @@ const PLAYERHEIGHT = 32;
 const WINDOWSTYLE = "rgba(60, 60, 0, 0.8)";
 const FONTSTYLE = "#FFFFFF";
 
-const gKey = new Uint8Array( 0x30 );		//	キー入力バッファ
+const gKey = new Uint8Array( 0x30 );	//	キー入力バッファ
 
 let stageNumber = 0;
-let MAP_HEIGHT = 9;			//	マップの高さ（タイル）
-let MAP_WIDTH = 7;			//	マップの幅（タイル）
+let MAP_HEIGHT = 9;					//	マップの高さ（タイル）
+let MAP_WIDTH = 7;					//	マップの幅（タイル）
 let START_X = 3;					//	開始位置X
 let START_Y = 7;					//	開始位置Y
-let BOX_X = 3;					//	BOX開始位置X
-let BOX_Y = 5;					//	BOX開始位置Y
+let BOX_X = 3;						//	BOX開始位置X
+let BOX_Y = 5;						//	BOX開始位置Y
 
 let isGameOver = false;
 
 let gAngle = 0;
-let gFrame = 0;					//	内部カウンタ
-let gHeight;					//	実画面の高さ
-let gWidth;						//	実画面の幅
-let gImgMap;					//	マップチップを入れる
-let gImgSprite;					//	プレイヤー
+let gFrame = 0;						//	内部カウンタ
+let gHeight;						//	実画面の高さ
+let gWidth;							//	実画面の幅
+let gImgMap;						//	マップチップを入れる
+let gImgSprite;						//	プレイヤー
 let gImgBackground;
 let	gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
 let	gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
-let	gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
-let	gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
-let gScreen;					//	仮想画面 
-let gMap;						//	マップのタイル構成
+let	gBoxX = BOX_X * TILESIZE;		//	プレイヤー座標X
+let	gBoxY = BOX_Y * TILESIZE;		//	プレイヤー座標Y
+let gScreen;						//	仮想画面 
+let gMap;							//	マップのタイル構成
 let gSprite;
-let	gPlayerMoveX = 0;							//	移動量X
-let	gPlayerMoveY = 0;							//	移動量Y
-let	gBoxMoveX = 0;							//	移動量X
-let	gBoxMoveY = 0;							//	移動量Y
+let	gPlayerMoveX = 0;				//	移動量X
+let	gPlayerMoveY = 0;				//	移動量Y
+let	gBoxMoveX = 0;					//	移動量X
+let	gBoxMoveY = 0;					//	移動量Y
 let mapColumn;
 let mapRow;
 
