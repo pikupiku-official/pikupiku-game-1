@@ -2,6 +2,7 @@
 
 //	Hello world(あさい)
 //	test 2nd
+// aiuoe
 /*
 declare variables and constants
 */
