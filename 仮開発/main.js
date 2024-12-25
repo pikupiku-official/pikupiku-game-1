@@ -7,7 +7,10 @@
 declare variables and constants
 */
 
-const FONT = "12px DotGothic16";	//	フォント
+const FONT_SIZE = 16; // フォントサイズ
+let FONT = null;
+let globalFontStyle = null;
+
 const HEIGHT = 224;					//	仮想画面の高さ（ピクセル）
 const WIDTH = 256;					//	仮装画面の幅（ピクセル） 
 const SCROLL = 2;
@@ -29,6 +32,8 @@ let START_Y = 7;					//	開始位置Y
 let BOX_X = 3;						//	BOX開始位置X
 let BOX_Y = 5;						//	BOX開始位置Y
 
+
+
 let isGameOver = false;
 
 let gAngle = 0;
@@ -40,9 +45,12 @@ let gImgSprite;						//	プレイヤー
 let gImgBackground;
 let	gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
 let	gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
-let	gBoxX = BOX_X * TILESIZE;		//	プレイヤー座標X
-let	gBoxY = BOX_Y * TILESIZE;		//	プレイヤー座標Y
-let gScreen;						//	仮想画面 
+let	gBoxX = BOX_X * TILESIZE;		//	BOX座標X
+let	gBoxY = BOX_Y * TILESIZE;		//	BOX座標Y
+
+let boxes = []; // BOXの配列を初期化
+
+let gScreen;						//	仮想画面
 let gMap;							//	マップのタイル構成
 let gSprite;
 let	gPlayerMoveX = 0;				//	移動量X
@@ -53,8 +61,6 @@ let mapColumn;
 let mapRow;
 
 let initialPlayerAngle;
-
-
 
 let soundBGM;
 let soundCollision;
@@ -76,8 +82,8 @@ let keyboardDisabled = false;
 
 let clear = 0;
 
-const gFileMap = "img/BG.png";			//	specify map-chip image
-const gFileSprite = "img/spriten.png";	//	specify player image
+const gFileMap = "img/BG_00.png";			//	specify map-chip image
+const gFileSprite = "img/sprite.png";	//	specify player image
 const gFileBackground = "img/background.jpg"	// specify background image
 
 let fileSoundBGM = "sound/BGM/FC/FC_pikupikuTheme.mp3";
@@ -102,22 +108,36 @@ function LoadData() {
                 return response.json();
             })
             .then(data => {
-                const MAP_KEY = `mapData_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
+                const MAPKEY_00 = `mapData00_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
+				const MAPKEY_01 = `mapData01_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
                 const SPRITE_KEY = `spriteData_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
                 const DIRECTION_KEY = `directionPikupikun_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
-                gMap = data[MAP_KEY];
+                gMap = data[MAPKEY_00];
                 gSprite = data[SPRITE_KEY];
                 directionPikupikun = data[DIRECTION_KEY];
-                START_X = data.playerStartX[stageNumber];
-                START_Y = data.playerStartY[stageNumber];
+                START_X = data.playerStart[stageNumber][0];
+                START_Y = data.playerStart[stageNumber][1];
 				BOX_X = data.boxStartX[stageNumber];
                 BOX_Y = data.boxStartY[stageNumber];
                 indexFlag = gSprite.indexOf("F");
 				indexPikupikun = findAllIndexes(gSprite, "P");
-                MAP_WIDTH = data.mapColumn[stageNumber] + 1;
-                MAP_HEIGHT = data.mapRow[stageNumber] + 1;
-				initialPlayerAngle = data.playerAngle[stageNumber];
+                MAP_WIDTH = data.mapSize[stageNumber][0] + 1;
+                MAP_HEIGHT = data.mapSize[stageNumber][1] + 1;
+				initialPlayerAngle = data.playerStart[stageNumber][2];
 				console.log(indexPikupikun)
+
+                // BOXデータの初期化
+                boxes = [];
+                const boxStartData = data.boxStart[stageNumber];
+                for (let i = 0; i < boxStartData.length; i += 2) {
+                    boxes.push({
+                        x: boxStartData[i] * TILESIZE,
+                        y: boxStartData[i + 1] * TILESIZE,
+                        moveX: 0,
+                        moveY: 0
+                    });
+                }
+
                 resolve(); // 完了を通知
             })
             .catch(error => {
@@ -132,8 +152,9 @@ function LoadData() {
 */
 
 //	MAP・箱・プレイヤー・探索マス表示の順に描画
-function DrawMain() {
-	const g = gScreen.getContext("2d");	//	get 2D context of virtual display
+// DrawMain関数の修正
+async function DrawMain() {
+	const g = gScreen.getContext("2d"); // 仮想画面のコンテキストを取得
 
 	g.drawImage(gImgBackground, 0, 0);	//	render the background image
 
@@ -155,13 +176,16 @@ function DrawMain() {
 		}
 	}
 
-	//	render the box
-	g.drawImage(gImgSprite, 
-		48, 
-		32, 
-		PLAYERWIDTH, 16,
-		(WIDTH - TILESIZE) / 2 + gBoxX - gPlayerX, (HEIGHT - TILESIZE) / 2 + gBoxY - gPlayerY, 
-		PLAYERWIDTH, 16);	//	プレイヤー画像の表示
+    // BOXを描画
+    for (let box of boxes) {
+        g.drawImage(
+            gImgSprite,
+            48, 32, PLAYERWIDTH, 16,
+            (WIDTH - TILESIZE) / 2 + box.x - gPlayerX,
+            (HEIGHT - TILESIZE) / 2 + box.y - gPlayerY,
+            PLAYERWIDTH, 16
+        );
+    }
 
 	if (indexPikupikun && Array.isArray(indexPikupikun)) {
     for (let n = 0; n < indexPikupikun.length; n++) {
@@ -180,35 +204,31 @@ function DrawMain() {
 		PLAYERWIDTH, PLAYERHEIGHT,
 		(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2, 
 		PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
-
-
-
-	//DrawLaser();
 	
 /*
 *	debug elements
 */
-
-	//	red lines illustrate player coordinate
-	//g.fillStyle = "#ff0000";
-	//g.fillRect(0, HEIGHT/2 - 1, WIDTH, 2);
-	//g.fillRect(WIDTH/2 - 1, 0, 2, HEIGHT);
+    // フォントスタイルを設定
+    if (globalFontStyle) {
+        g.font = globalFontStyle;
+    } else {
+        console.warn("フォントスタイルが未初期化です。デフォルトフォントを使用します。");
+        g.font = "16px sans-serif"; // フォールバックとしてデフォルトフォントを使用
+    }    
 
 	//	set window color
 	g.fillStyle = WINDOWSTYLE;
 	g.fillRect(4, 189, 248, 20);
 
-	//	display frame reload
-	g.font = FONT;
-g.fillStyle = FONTSTYLE;
+	g.fillStyle = FONTSTYLE;
 
-const paddedX = String(Math.floor(gPlayerX)).padStart(3, '0'); // gPlayerXを3桁ゼロパディング
-const paddedY = String(Math.floor(gPlayerY)).padStart(3, '0'); // gPlayerYを3桁ゼロパディング
-const paddedStep = String(stepCounter).padStart(4, '0'); // stepCounterを3桁ゼロパディング
-const paddedStage = String(stageNumber).padStart(2, '0'); // stageNumberを3桁ゼロパディング
-const mapValue = gMap[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
+	const paddedX = String(Math.floor(gPlayerX)).padStart(3, '0'); // gPlayerXを3桁ゼロパディング
+	const paddedY = String(Math.floor(gPlayerY)).padStart(3, '0'); // gPlayerYを3桁ゼロパディング
+	const paddedStep = String(stepCounter).padStart(4, '0'); // stepCounterを3桁ゼロパディング
+	const paddedStage = String(stageNumber).padStart(2, '0'); // stageNumberを3桁ゼロパディング
+	const mapValue = gMap[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
 
-g.fillText(`x,y=${paddedX}, ${paddedY} step=${paddedStep} s=${paddedStage} m=${mapValue} ${isGameOver}`, 10, 203);
+	g.fillText(`x,y=${paddedX}, ${paddedY} 歩数=${paddedStep} s=${paddedStage} m=${mapValue} ${isGameOver}`, 10, 203);
 
 
 }
@@ -276,32 +296,53 @@ function DrawLaser() {
 
 
 //	canvasに映像出力
-function WmPaint()	{
-	DrawMain();
+function WmPaint() {
+    DrawMain();
 
-	const ca = document.getElementById("gameDisplay");	//	main L
-	const g = ca.getContext("2d");		//	2D ` 
-	g.drawImage(gScreen, 0, 0, gScreen.width, gScreen.height, 0, 0, gWidth, gHeight);	//	   
+    const ca = document.getElementById("gameDisplay");
+    const g = ca.getContext("2d");
+
+    // 仮想画面をスケーリングして描画
+    g.drawImage(gScreen, 0, 0, gScreen.width, gScreen.height, 0, 0, gWidth, gHeight);
 }
+
 
 //	ブラウザサイズ変更イベント
-function WmSize()	{
-	const ca = document.getElementById("gameDisplay");	//	gameDisplayのcanvasを取得
-	ca.width = window.innerWidth;					//	 canvasの横幅をウィンドウ幅に変更
-	ca.height = window.innerHeight - 100;					//	 canvasの縦幅をウィンドウ幅に変更
+function WmSize() {
+    const ca = document.getElementById("gameDisplay");
+    const scale = window.devicePixelRatio || 1;
 
-	const g = ca.getContext("2d");				//	2D描画コンテキスト取得
-	g.imageSmoothingEnabled = g.msImageSmoothingEnabled = false;	//	  ドット絵に対するアンチエイリアスを消す
+    // ウィンドウサイズに基づいて仮想サイズを計算
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight - 100; // 上部の余白を考慮
 
-	//	ウィンドウ＝canvasからゲーム画面がはみ出ないように、幅の小さいほうに合わせる
-	gWidth = ca.width;
-	gHeight = ca.height;
-	if (gWidth / WIDTH < gHeight / HEIGHT) {
-		gHeight = gWidth * HEIGHT / WIDTH;
-	} else {
-		gWidth = gHeight * WIDTH / HEIGHT;
-	}
+    let adjustedWidth = windowWidth;
+    let adjustedHeight = windowHeight;
+
+    // アスペクト比を維持
+    if (adjustedWidth / WIDTH < adjustedHeight / HEIGHT) {
+        adjustedHeight = adjustedWidth * HEIGHT / WIDTH;
+    } else {
+        adjustedWidth = adjustedHeight * WIDTH / HEIGHT;
+    }
+
+    // 実際のピクセル数を設定 (scaleを考慮)
+    ca.width = Math.floor(adjustedWidth * scale);
+    ca.height = Math.floor(adjustedHeight * scale);
+
+    // CSSサイズを設定 (見た目)
+    ca.style.width = `${Math.floor(adjustedWidth)}px`;
+    ca.style.height = `${Math.floor(adjustedHeight)}px`;
+
+    // 内部描画用の幅と高さをスケーリングに基づいて保存
+    gWidth = ca.width / scale;
+    gHeight = ca.height / scale;
+
+    const g = ca.getContext("2d");
+    g.imageSmoothingEnabled = g.msImageSmoothingEnabled = false; // アンチエイリアス無効化
+    g.scale(scale, scale); // 高解像度に対応
 }
+
 
 //	タイマーイベント発生時の処理   
 function WmTimer()	{
@@ -377,12 +418,14 @@ function ProhibitEntry() {
 */
 
 function InitializeEvent() {
+	LoadData();
 	gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
 	gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
-	gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
-	gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
+	//gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
+	//gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
 	gAngle = initialPlayerAngle;
 	clear = 0;
+
 }
 
 //	ぴくぴくんの視界探索（見つかったら死ぬぞ）
@@ -398,9 +441,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				}
 
 			// boxに到達した場合は終了する
-			if (gBoxX >= exploreX - TILESIZE/2 && gBoxY == exploreY) {
+			let boxCollision = boxes.some(box => 
+				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
+			);
+			if (boxCollision) {
 				break;
-				}
+			}
 			
 			// playerに到達した場合、位置を返却する
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
@@ -438,9 +484,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				}
 
 			// boxに到達した場合は終了する
-			if (gBoxX == exploreX && gBoxY >= exploreY - TILESIZE/2) {
+			let boxCollision = boxes.some(box => 
+				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
+			);
+			if (boxCollision) {
 				break;
-				}
+			}
 			
 			// playerに到達した場合、位置を返却する
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
@@ -472,9 +521,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			TILESIZE, TILESIZE)
 
 			// boxに到達した場合は終了する
-			if (gBoxX <= exploreX + TILESIZE/2 && gBoxY == exploreY) {
+			let boxCollision = boxes.some(box => 
+				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
+			);
+			if (boxCollision) {
 				break;
-				}
+			}
 			
 			// playerに到達した場合、位置を返却する
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
@@ -489,9 +541,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			TILESIZE, TILESIZE)
 
 			// boxに到達した場合は終了する
-			if (gBoxX == exploreX - TILESIZE && gBoxY <= exploreY + TILESIZE/2) {
+			let boxCollision = boxes.some(box => 
+				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
+			);
+			if (boxCollision) {
 				break;
-				}
+			}
 			
 			// playerに到達した場合、位置を返却する
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
@@ -566,13 +621,15 @@ function checkKeyAndMove() {
     const arrowKeys = ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'];
     let anyArrowKeyPressed = arrowKeys.some(key => keyState[key]);
 
-    if (anyArrowKeyPressed && gPlayerMoveX === 0 && gPlayerMoveY === 0 && gBoxMoveX == 0 && gBoxMoveY == 0 && keyboardDisabled == false) {
+    // すべてのボックスの移動状態を確認
+    let allBoxesStationary = boxes.every(box => box.moveX === 0 && box.moveY === 0);
+
+    if (anyArrowKeyPressed && gPlayerMoveX === 0 && gPlayerMoveY === 0 && allBoxesStationary && !keyboardDisabled) {
         if (!moveZeroTimer) {
             moveZeroTimer = setTimeout(() => {
-				PlaySoundCollision();
+                PlaySoundCollision();
                 collisionSoundTimer = setInterval(PlaySoundCollision, 1000);
-            }, 
-		200);
+            }, 200);
         }
     } else {
         if (moveZeroTimer) {
@@ -584,7 +641,8 @@ function checkKeyAndMove() {
             collisionSoundTimer = null;
         }
     }
-	}
+}
+
 
 function MoveLeft() {
 	gKey[ 37 ] = true;
@@ -615,66 +673,96 @@ function MoveDown() {
 }
 
 //	キー入力処理(上下左右)　この関数長すぎるから別のモジュールに移管したほうが良い
-function TickField()	{
+function TickField() {
+    // プレイヤーが移動中、または入力が無効の場合は何もしない
+	for(let box of boxes) {
+	if (gPlayerMoveX !== 0 || gPlayerMoveY !== 0 || keyboardDisabled) {}
+    // キー入力に応じてプレイヤーの移動を設定
+    else if (gKey[37]) { // 左
+        gAngle = 3;
+        gPlayerMoveX = -TILESIZE;
+        stepCounter++;
+    } else if (gKey[38]) { // 上
+        gAngle = 0;
+        gPlayerMoveY = -TILESIZE;
+        stepCounter++;
+    } else if (gKey[39]) { // 右
+        gAngle = 2;
+        gPlayerMoveX = TILESIZE;
+        stepCounter++;
+    } else if (gKey[40]) { // 下
+        gAngle = 1;
+        gPlayerMoveY = TILESIZE;
+        stepCounter++;
+    }
+}
 
-	if( gPlayerMoveX != 0 || gPlayerMoveY != 0 || keyboardDisabled == true || gBoxMoveX != 0 || gBoxMoveY != 0){}				//	移動中の場合
-	else if( gKey[ 37 ] ){	gAngle = 3;	gPlayerMoveX = -TILESIZE; stepCounter++	}	//	左
-	else if( gKey[ 38 ] ){	gAngle = 0;	gPlayerMoveY = -TILESIZE; stepCounter++	}	//	上
-	else if( gKey[ 39 ] ){	gAngle = 2;	gPlayerMoveX =  TILESIZE; stepCounter++	}	//	右
-	else if( gKey[ 40 ] ){	gAngle = 1;	gPlayerMoveY =  TILESIZE; stepCounter++	}	//	下
+    // 移動後のタイル座標を計算
+    let mPlayerX = Math.floor((gPlayerX + gPlayerMoveX) / TILESIZE);
+    let mPlayerY = Math.floor((gPlayerY + gPlayerMoveY) / TILESIZE);
+    let mPlayerMap = gMap[mPlayerY * MAP_WIDTH + mPlayerX];
+    let mPlayerSprite = gSprite[mPlayerY * MAP_WIDTH + mPlayerX];
 
-	let		mPlayerX = Math.floor( ( gPlayerX + gPlayerMoveX ) / TILESIZE );	//	移動後のタイル座標X
-	let		mPlayerY = Math.floor( ( gPlayerY + gPlayerMoveY ) / TILESIZE );	//	移動後のタイル座標Y
-	let		mPlayerMap = gMap[ mPlayerY * MAP_WIDTH + mPlayerX ];				//	プレイヤーの位置するタイル番号
-	let		mPlayerSprite = gSprite[ mPlayerY * MAP_WIDTH + mPlayerX ];			//	プレイヤーの位置するスプライト番号
-
-	//	壁・敵・箱には進入できない
-	if( mPlayerMap > 3 || mPlayerSprite == "P" || (mPlayerX * TILESIZE == gBoxX && mPlayerY * TILESIZE == gBoxY)){									//	侵入不可の地形の場合
-		ProhibitEntry();
-		stepCounter--
+    // 壁や敵、ボックスに進入できないようにする
+	for(let box of boxes) {
+		if (mPlayerMap > 3 || mPlayerSprite === "P" || (box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) || box.moveX !== 0 || box.moveY !== 0) {
+        ProhibitEntry();
+        stepCounter--; // 進入できない場合は歩数を元に戻す
+    }
 	}
 
-	gPlayerX += Math.sign( gPlayerMoveX ) * SCROLL;				//	プレイヤー座標移動X
-	gPlayerY += Math.sign( gPlayerMoveY ) * SCROLL;				//	プレイヤー座標移動Y
-	gPlayerMoveX -= Math.sign( gPlayerMoveX ) * SCROLL;					//	移動量消費X
-	gPlayerMoveY -= Math.sign( gPlayerMoveY ) * SCROLL;					//	移動量消費Y
+    // プレイヤー座標を更新
+    gPlayerX += Math.sign(gPlayerMoveX) * SCROLL;
+    gPlayerY += Math.sign(gPlayerMoveY) * SCROLL;
+    gPlayerMoveX -= Math.sign(gPlayerMoveX) * SCROLL;
+    gPlayerMoveY -= Math.sign(gPlayerMoveY) * SCROLL;
 
-	//	移動先が箱なら箱を動かす
-	if (mPlayerX * TILESIZE == gBoxX && mPlayerY * TILESIZE == gBoxY) {
-		ProhibitEntry();
-		if( gBoxMoveX == 0 && gBoxMoveY == 0 ){
-			if		( gKey[ 37 ] ) { gBoxMoveX = -TILESIZE;}	//	左
-			else if	( gKey[ 38 ] ) { gBoxMoveY = -TILESIZE;}	//	上
-			else if	( gKey[ 39 ] ) { gBoxMoveX =  TILESIZE;}	//	右
-			else if	( gKey[ 40 ] ) { gBoxMoveY =  TILESIZE;}	//	下
-			}
-	}
+    // ボックスがある場合の処理
+    for (let box of boxes) {
+        if (box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) {
+            ProhibitEntry(); // プレイヤーの移動を禁止
+            // ボックスが動いていない場合のみ移動を設定
+            if (box.moveX === 0 && box.moveY === 0) {
+                if (gKey[37]) { box.moveX = -TILESIZE; } // 左
+                else if (gKey[38]) { box.moveY = -TILESIZE; console.log("↑");} // 上
+                else if (gKey[39]) { box.moveX = TILESIZE; } // 右
+                else if (gKey[40]) { box.moveY = TILESIZE; } // 下
+            }
+			
+        }
 
-	//BOX
-	let		mBoxX = Math.floor( ( gBoxX + gBoxMoveX ) / TILESIZE );	//	移動後のタイル座標X
-	let		mBoxY = Math.floor( ( gBoxY + gBoxMoveY ) / TILESIZE );	//	移動後のタイル座標Y
-	let		mBoxMap = gMap[ mBoxY * MAP_WIDTH + mBoxX ];			//	箱の位置するタイル番号
-	let		mBoxSprite = gSprite[ mBoxY * MAP_WIDTH + mBoxX ];		//	箱の位置するスプライト番号
+        // ボックスの移動先をチェック
+        let mBoxX = Math.floor((box.x + box.moveX) / TILESIZE);
+        let mBoxY = Math.floor((box.y + box.moveY) / TILESIZE);
+        let mBoxMap = gMap[mBoxY * MAP_WIDTH + mBoxX];
+        let mBoxSprite = gSprite[mBoxY * MAP_WIDTH + mBoxX];
 
-	if (mBoxMap > 3 || mBoxSprite != 0) {
-		gBoxMoveX = 0;
-		gBoxMoveY = 0;
-	}
+		let boxCollision = boxes.some(otherBox => 
+            otherBox !== box && otherBox.x === mBoxX * TILESIZE && otherBox.y === mBoxY * TILESIZE
+        );
 
-	if (gBoxMoveX == -TILESIZE || gBoxMoveX == TILESIZE || gBoxMoveY == TILESIZE || gBoxMoveY == -TILESIZE) {
-		PlaySoundDraggingBox();
-	}
+        if (mBoxMap > 3 || mBoxSprite !== 0 || boxCollision) { // 障害物または他のボックスがある場合
+            box.moveX = 0;
+            box.moveY = 0;
+        }
 
-	gBoxX += Math.sign( gBoxMoveX ) * (SCROLL / 2);				//	BOX座標移動X
-	gBoxY += Math.sign( gBoxMoveY ) * (SCROLL / 2);				//	BOX座標移動Y
-	gBoxMoveX -= Math.sign( gBoxMoveX ) * (SCROLL / 2);			//	移動量消費X
-	gBoxMoveY -= Math.sign( gBoxMoveY ) * (SCROLL / 2);			//	移動量消費Y
+		if(box.moveX === -TILESIZE || box.moveY === -TILESIZE || box.moveX === TILESIZE || box.moveY === TILESIZE) {
+			PlaySoundDraggingBox();
+		}
 
-	//	クリア処理
-	if(clear == 0 && (indexFlag % MAP_WIDTH) * TILESIZE == gPlayerX && Math.floor(indexFlag / MAP_HEIGHT) * TILESIZE == gPlayerY) {
-		StageClear();
-	}
-	}
+        // ボックスの移動を更新
+        box.x += Math.sign(box.moveX) * (SCROLL / 2);
+        box.y += Math.sign(box.moveY) * (SCROLL / 2);
+        box.moveX -= Math.sign(box.moveX) * (SCROLL / 2);
+        box.moveY -= Math.sign(box.moveY) * (SCROLL / 2);
+    }
+
+    // クリア処理
+    if (clear === 0 && gPlayerX === indexFlag % MAP_WIDTH * TILESIZE && gPlayerY === Math.floor(indexFlag / MAP_HEIGHT) * TILESIZE) {
+        StageClear();
+    }
+}
+
 
 /*
 コンテンツのロード
@@ -717,6 +805,28 @@ function LoadSound()	{
 	soundLaser = new Audio(); soundLaser.src = fileSoundLaser
 }
 
+// Google Fontsのリンクを動的に追加する関数
+function loadGoogleFont(fontName) {
+    const link = document.createElement("link");
+    const formattedFontName = fontName.replace(/ /g, "+");
+    link.href = `https://fonts.googleapis.com/css2?family=${formattedFontName}&display=swap`;
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+}
+
+// フォントをロードし、グローバル変数に保存する関数
+async function initializeFont(fontName, fontSize) {
+    loadGoogleFont(fontName); // Google Fontsをロード
+    try {
+        await document.fonts.load(`${fontSize}px ${fontName}`);
+        console.log(`${fontName} フォントがロードされました。`);
+        globalFontStyle = `${fontSize}px ${fontName}`; // フォントスタイルをグローバルに保存
+    } catch (error) {
+        console.error("フォントのロードに失敗しました:", error);
+        globalFontStyle = `${fontSize}px sans-serif`; // フォールバックフォント
+    }
+}
+
 /*
 イベント
 */
@@ -749,20 +859,28 @@ window.addEventListener("keyup", function (event) {
     }
 });
 
-// 定期的にキーと移動状態をチェック（存在意義が分からないので消しました　←アホ）
+// 定期的にキーと移動状態をチェック（存在意義が分からないので消しました　←分かったので戻しました）
 setInterval(checkKeyAndMove, 100);  // 100ミリ秒ごとにチェック（衝突状態のカウントに使ってます）
 
 //	ブラウザ起動イベント
-window.onload = function () {
-	LoadImage();	//	 マップ画像読み込み
-	LoadSound();
-	LoadData();
+window.onload = async function () {
+    LoadImage(); // 画像読み込み
+    LoadSound(); // サウンド読み込み
+    LoadData();  // データ読み込み
 
-	gScreen = document.createElement("canvas");	//	generate virtual display
-	gScreen.width = WIDTH;							//	仮想画面の幅を設定
-	gScreen.height = HEIGHT;						//	仮想画面の高さを設定
+    const scale = window.devicePixelRatio || 1; // スケールを取得
 
-	WmSize();										//	画面サイズ初期化
-	window.addEventListener("resize", function () { WmSize() });	//	ブラウザサイズ変更時にWmSize()を呼び出す
-	setInterval(function () { WmTimer() }, 33);		//	33ms間隔でWmTimer()を呼び出して画面更新(30.3fps)
-}
+    gScreen = document.createElement("canvas"); // 仮想画面生成
+    gScreen.width = WIDTH; // 仮想画面の幅
+    gScreen.height = HEIGHT; // 仮想画面の高さ
+    document.body.appendChild(gScreen);
+
+    // フォントを動的に設定
+    const adjustedFontSize = Math.floor(24 / scale); // 16pxを基準にスケール調整
+    await initializeFont("DotGothic16", adjustedFontSize); // フォントをロード
+
+    WmSize(); // 初期サイズ設定
+    window.addEventListener("resize", WmSize); // リサイズイベントに対応
+
+    setInterval(WmTimer, 33); // ゲームループ開始（約30fps）
+};
