@@ -24,15 +24,11 @@ const FONTSTYLE = "#FFFFFF";
 
 const gKey = new Uint8Array( 0x30 );	//	キー入力バッファ
 
-let stageNumber = 0;
-let MAP_HEIGHT = 9;					//	マップの高さ（タイル）
-let MAP_WIDTH = 7;					//	マップの幅（タイル）
-let START_X = 3;					//	開始位置X
-let START_Y = 7;					//	開始位置Y
-let BOX_X = 3;						//	BOX開始位置X
-let BOX_Y = 5;						//	BOX開始位置Y
-
-
+let stageNumber = 3;
+let MAP_HEIGHT = 10;					//	マップの高さ（タイル）
+let MAP_WIDTH = 12;					//	マップの幅（タイル）
+let START_X = 1;					//	開始位置X
+let START_Y = 9;					//	開始位置Y
 
 let isGameOver = false;
 
@@ -45,13 +41,12 @@ let gImgSprite;						//	プレイヤー
 let gImgBackground;
 let	gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
 let	gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
-let	gBoxX = BOX_X * TILESIZE;		//	BOX座標X
-let	gBoxY = BOX_Y * TILESIZE;		//	BOX座標Y
 
 let boxes = []; // BOXの配列を初期化
 
 let gScreen;						//	仮想画面
-let gMap;							//	マップのタイル構成
+let gMap00;							//	マップのタイル構成
+let gMap01;						//	マップチップを入れる
 let gSprite;
 let	gPlayerMoveX = 0;				//	移動量X
 let	gPlayerMoveY = 0;				//	移動量Y
@@ -82,7 +77,7 @@ let keyboardDisabled = false;
 
 let clear = 0;
 
-const gFileMap = "img/BG_00.png";			//	specify map-chip image
+const gFileMap = "img/BG_01.png";			//	specify map-chip image
 const gFileSprite = "img/sprite.png";	//	specify player image
 const gFileBackground = "img/background.jpg"	// specify background image
 
@@ -97,7 +92,7 @@ const fileSoundLaser = "sound/SE/laser.mp3";
 define functions
 */
 
-//	Assign tile configuration to gMap from mapData.json
+//	Assign tile configuration to gMap00 from mapData.json
 function LoadData() {
     return new Promise((resolve, reject) => {
         fetch('mapData.json') // specify json file
@@ -108,17 +103,15 @@ function LoadData() {
                 return response.json();
             })
             .then(data => {
-                const MAPKEY_00 = `mapData00_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
-				const MAPKEY_01 = `mapData01_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
-                const SPRITE_KEY = `spriteData_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
-                const DIRECTION_KEY = `directionPikupikun_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;
-                gMap = data[MAPKEY_00];
+                const MAPKEY_00 = `mapData00_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;	//	BG1面
+				const MAPKEY_01 = `mapData01_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;	//	BG2面	
+                const SPRITE_KEY = `spriteData_${stageNumber < 10 ? '0' + stageNumber : stageNumber}`;	//	スプライト面
+                gMap00 = data[MAPKEY_00];
+				gMap01 = data[MAPKEY_01];
                 gSprite = data[SPRITE_KEY];
-                directionPikupikun = data[DIRECTION_KEY];
+                directionPikupikun = data.directionPikupikun[stageNumber];
                 START_X = data.playerStart[stageNumber][0];
                 START_Y = data.playerStart[stageNumber][1];
-				BOX_X = data.boxStartX[stageNumber];
-                BOX_Y = data.boxStartY[stageNumber];
                 indexFlag = gSprite.indexOf("F");
 				indexPikupikun = findAllIndexes(gSprite, "P");
                 MAP_WIDTH = data.mapSize[stageNumber][0] + 1;
@@ -167,7 +160,7 @@ async function DrawMain() {
 				g, 
 		 		WIDTH/2 + (dx - 1/2) * TILESIZE - gPlayerX,
 				HEIGHT/2 + (dy - 1/2) * TILESIZE - gPlayerY, 
-				gMap[dx + dy * MAP_WIDTH]);
+				gMap00[dx + dy * MAP_WIDTH]);
 			DrawSprite(
 				g, 
 		 		WIDTH/2 + (dx - 1/2) * TILESIZE - gPlayerX,
@@ -187,16 +180,6 @@ async function DrawMain() {
         );
     }
 
-	if (indexPikupikun && Array.isArray(indexPikupikun)) {
-    for (let n = 0; n < indexPikupikun.length; n++) {
-        ExploreSquare(directionPikupikun[n], 
-			(indexPikupikun[n] % MAP_WIDTH) * TILESIZE, 
-			Math.floor(indexPikupikun[n] / MAP_WIDTH) * TILESIZE);
-    	}
-		} else {
-   		console.error("indexPikupikun is not defined or not an array.");
-		}
-
 	//　render the player
 	g.drawImage(gImgSprite, 
 		gAngle * PLAYERWIDTH, 
@@ -205,6 +188,26 @@ async function DrawMain() {
 		(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2, 
 		PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 	
+		for (let dy = 0; dy < MAP_HEIGHT; dy++) {
+			for (let dx = 0; dx < MAP_WIDTH; dx++) {
+				DrawTile(
+					g, 
+					 WIDTH/2 + (dx - 1/2) * TILESIZE - gPlayerX,
+					HEIGHT/2 + (dy - 1/2) * TILESIZE - gPlayerY, 
+					gMap01[dx + dy * MAP_WIDTH]);
+			}
+		}
+
+	if (indexPikupikun && Array.isArray(indexPikupikun)) {
+    	for (let n = 0; n < indexPikupikun.length; n++) {
+        	ExploreSquare(directionPikupikun[n], 
+			(indexPikupikun[n] % MAP_WIDTH) * TILESIZE, 
+			Math.floor(indexPikupikun[n] / MAP_WIDTH) * TILESIZE);
+    	}
+		} else {
+   		console.error("indexPikupikun is not defined or not an array.");
+		}
+
 /*
 *	debug elements
 */
@@ -226,9 +229,10 @@ async function DrawMain() {
 	const paddedY = String(Math.floor(gPlayerY)).padStart(3, '0'); // gPlayerYを3桁ゼロパディング
 	const paddedStep = String(stepCounter).padStart(4, '0'); // stepCounterを3桁ゼロパディング
 	const paddedStage = String(stageNumber).padStart(2, '0'); // stageNumberを3桁ゼロパディング
-	const mapValue = gMap[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
+	const mapValue00 = gMap00[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
+	const mapValue01 = gMap01[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
 
-	g.fillText(`x,y=${paddedX}, ${paddedY} 歩数=${paddedStep} s=${paddedStage} m=${mapValue} ${isGameOver}`, 10, 203);
+	g.fillText(`x,y=${paddedX}, ${paddedY} 歩数=${paddedStep} s=${paddedStage} m=${mapValue00} ${isGameOver}`, 10, 203);
 
 
 }
@@ -273,17 +277,17 @@ function DrawSprite(g, x, y, idx) {
         } else if (direction === 1) {
             g.drawImage(gImgSprite,  
                 0, 
-                0 + (BinaryOscillator(80, 8) * 16), 
+                0 + (BinaryOscillator(90, 6) * 16), 
                 TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);
         } else if (direction === 2) {
             g.drawImage(gImgSprite,  
-                16 - (BinaryOscillator(80, 8) * 16), 
-                0 + (BinaryOscillator(80, 8) * 16), 
+                16 - (BinaryOscillator(60, 12) * 16), 
+                0 + (BinaryOscillator(60, 12) * 16), 
                 TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);
         } else {
             g.drawImage(gImgSprite,  
-                48 - (BinaryOscillator(80, 8) * 48), 
-                0 + (BinaryOscillator(80, 8) * 16), 
+                48 - (BinaryOscillator(80, 6) * 48), 
+                0 + (BinaryOscillator(80, 6) * 16), 
                 TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);
         }
         DrawSprite.pikupikuOrder++; // 次のピクピクンに進む
@@ -437,17 +441,17 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 	if (directionPikupikun == 0) {
 		exploreX -= TILESIZE
 		for (; exploreX > 0; exploreX -= TILESIZE) {
-			if (!isGameOver) {g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
-				}
-
 			// boxに到達した場合は終了する
-			let boxCollision = boxes.some(box => 
-				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
-			);
-			if (boxCollision) {
+			let boxCollision = boxes.some(box =>
+				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY);
+
+			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 				break;
 			}
-			
+
+			if (!isGameOver) {g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
+			}
+
 			// playerに到達した場合、位置を返却する
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
 				GameOver();
@@ -466,33 +470,31 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX - TILESIZE * (dx + 1), 
 						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - 8,
 						16,32
-						)
+					)
 				}
 				break;
 				}
-
-			
-
 			}
 		}
+		
 	if (directionPikupikun == 1) {
 		exploreY -= TILESIZE
-		for (; exploreY > 0; exploreY -= TILESIZE) {
+			for (; exploreY > 0; exploreY -= TILESIZE) {
+			// boxに到達した場合は終了する
+			let boxCollision = boxes.some(box => 
+				box.y >= exploreY - TILESIZE / 2 && box.y <= exploreY + TILESIZE / 2 && box.x === exploreX
+			);
+			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+				break;
+			}
+
 			if (!isGameOver) {
 				g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
 			TILESIZE, TILESIZE)
 				}
-
-			// boxに到達した場合は終了する
-			let boxCollision = boxes.some(box => 
-				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
-			);
-			if (boxCollision) {
-				break;
-			}
 			
 			// playerに到達した場合、位置を返却する
-			if (gPlayerX == exploreX && gPlayerY == exploreY) {
+			if (gPlayerX == exploreX && gPlayerY == exploreY ) {
 				GameOver();
 				let dy = 0;
 				for(; dy < Math.ceil(HEIGHT / TILESIZE); dy++) {
@@ -514,43 +516,85 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				break;
 				}
 			}
+		
 		}
-	if (directionPikupikun == 2) {
-		for (; exploreX <= 16; exploreX += TILESIZE) {
-			g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
-			TILESIZE, TILESIZE)
 
-			// boxに到達した場合は終了する
-			let boxCollision = boxes.some(box => 
-				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
-			);
-			if (boxCollision) {
-				break;
-			}
-			
-			// playerに到達した場合、位置を返却する
-			if (gPlayerX == exploreX && gPlayerY == exploreY) {
-				GameOver();
-				break;
+	if (directionPikupikun == 2) {
+			exploreX += TILESIZE
+			for (; exploreX <= 16; exploreX += TILESIZE) {
+				// boxに到達した場合は終了する
+				let boxCollision = boxes.some(box =>
+					box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY);
+	
+				if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+					break;
 				}
-			}
+	
+				if (!isGameOver) {g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
+				}
+	
+				// playerに到達した場合、位置を返却する
+				if (gPlayerX == exploreX && gPlayerY == exploreY) {
+					GameOver();
+					let dx = 0;
+					for(; dx < Math.ceil(WIDTH / TILESIZE); dx++) {
+						g.drawImage(gImgSprite, 
+							(BinaryOscillator(6, 3)) * 16 + Math.sign(dx) * 32, 80,
+							16, 32,
+							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX - TILESIZE * (dx + 1), 
+							HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - 8,
+							16,32
+							)
+						g.drawImage(gImgSprite, 
+							16 + (((Math.sign(dx) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32 - Math.sign(dx) * 16, 48,
+							16, 32,
+							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX - TILESIZE * (dx + 1), 
+							HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - 8,
+							16,32
+						)
+					}
+					break;
+					}
+				}
+
+
 		}
 	if (directionPikupikun == 3) {
-		for (; exploreY <= 16; exploreX += TILESIZE) {
-			g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
-			TILESIZE, TILESIZE)
-
+		exploreY += TILESIZE
+			for (; exploreY <= MAP_HEIGHT * TILESIZE; exploreY += TILESIZE) {
 			// boxに到達した場合は終了する
 			let boxCollision = boxes.some(box => 
-				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY
+				box.y >= exploreY - TILESIZE / 2 && box.y <= exploreY + TILESIZE / 2 && box.x === exploreX
 			);
-			if (boxCollision) {
+			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 				break;
 			}
+
+			if (!isGameOver) {
+				g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
+			TILESIZE, TILESIZE)
+				}
 			
 			// playerに到達した場合、位置を返却する
-			if (gPlayerX == exploreX && gPlayerY == exploreY) {
+			if (gPlayerX == exploreX && gPlayerY == exploreY ) {
 				GameOver();
+				let dy = 0;
+				for(; dy < Math.ceil(HEIGHT / TILESIZE); dy++) {
+					g.drawImage(gImgSprite, 
+						Math.sign(dy) * 32, 144 + BinaryOscillator(6, 3) * 16,
+						32, 16,
+						WIDTH/2 - gPlayerX - TILESIZE + pikupikunX, 
+						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - TILESIZE * (dy + 1),
+						32,16
+						)
+					g.drawImage(gImgSprite, 
+						(((Math.sign(dy) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32, 128 - Math.sign(dy) * 16,
+						32, 16,
+						WIDTH/2 - gPlayerX - TILESIZE + pikupikunX, 
+						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - TILESIZE * (dy + 1),
+						32, 16
+						)
+				}
 				break;
 				}
 			}
@@ -675,41 +719,59 @@ function MoveDown() {
 //	キー入力処理(上下左右)　この関数長すぎるから別のモジュールに移管したほうが良い
 function TickField() {
     // プレイヤーが移動中、または入力が無効の場合は何もしない
-	for(let box of boxes) {
-	if (gPlayerMoveX !== 0 || gPlayerMoveY !== 0 || keyboardDisabled) {}
-    // キー入力に応じてプレイヤーの移動を設定
-    else if (gKey[37]) { // 左
+
+	if (gPlayerMoveX !== 0 || gPlayerMoveY !== 0 || keyboardDisabled || boxes.some(box => box.moveX !== 0 || box.moveY !== 0)) {
+	} else if (gKey[37]) { // 左
         gAngle = 3;
         gPlayerMoveX = -TILESIZE;
-        stepCounter++;
+		setTimeout(() => {		//	この直後に「移動やっぱやーめた」イベントがあるんだが、そこで「やっぱやめた」のに歩数が加算されるのを防ぐため。
+			if (gPlayerMoveX !== 0)
+			stepCounter++;
+		}, 3);
+        
     } else if (gKey[38]) { // 上
         gAngle = 0;
         gPlayerMoveY = -TILESIZE;
-        stepCounter++;
+		setTimeout(() => {
+			if (gPlayerMoveY !== 0)
+			stepCounter++;
+		}, 3);
     } else if (gKey[39]) { // 右
         gAngle = 2;
         gPlayerMoveX = TILESIZE;
-        stepCounter++;
+		setTimeout(() => {
+			if (gPlayerMoveX !== 0)
+			stepCounter++;
+		}, 3);
     } else if (gKey[40]) { // 下
         gAngle = 1;
         gPlayerMoveY = TILESIZE;
-        stepCounter++;
+		setTimeout(() => {
+			if (gPlayerMoveY !== 0)
+			stepCounter++;
+		}, 3);
     }
-}
+
+
+
 
     // 移動後のタイル座標を計算
     let mPlayerX = Math.floor((gPlayerX + gPlayerMoveX) / TILESIZE);
     let mPlayerY = Math.floor((gPlayerY + gPlayerMoveY) / TILESIZE);
-    let mPlayerMap = gMap[mPlayerY * MAP_WIDTH + mPlayerX];
+    let mPlayerMap00 = gMap00[mPlayerY * MAP_WIDTH + mPlayerX];
+	let mPlayerMap01 = gMap01[mPlayerY * MAP_WIDTH + mPlayerX];
     let mPlayerSprite = gSprite[mPlayerY * MAP_WIDTH + mPlayerX];
 
     // 壁や敵、ボックスに進入できないようにする
-	for(let box of boxes) {
-		if (mPlayerMap > 3 || mPlayerSprite === "P" || (box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) || box.moveX !== 0 || box.moveY !== 0) {
-        ProhibitEntry();
-        stepCounter--; // 進入できない場合は歩数を元に戻す
-    }
-	}
+
+		if (mPlayerMap00 > 79 || mPlayerMap01 > 79 || mPlayerSprite === "P" || boxes.some(box => box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) || boxes.some(box => box.moveX !== 0 || box.moveY !== 0)) {
+        	ProhibitEntry();
+			if(boxes.some(box => box.moveX === TILESIZE || box.moveY === TILESIZE)){}
+			//stepCounter--; // 進入できない場合は歩数を元に戻す
+	 	}
+
+
+	
 
     // プレイヤー座標を更新
     gPlayerX += Math.sign(gPlayerMoveX) * SCROLL;
@@ -724,9 +786,10 @@ function TickField() {
             // ボックスが動いていない場合のみ移動を設定
             if (box.moveX === 0 && box.moveY === 0) {
                 if (gKey[37]) { box.moveX = -TILESIZE; } // 左
-                else if (gKey[38]) { box.moveY = -TILESIZE; console.log("↑");} // 上
+                else if (gKey[38]) { box.moveY = -TILESIZE;} // 上
                 else if (gKey[39]) { box.moveX = TILESIZE; } // 右
                 else if (gKey[40]) { box.moveY = TILESIZE; } // 下
+				
             }
 			
         }
@@ -734,14 +797,15 @@ function TickField() {
         // ボックスの移動先をチェック
         let mBoxX = Math.floor((box.x + box.moveX) / TILESIZE);
         let mBoxY = Math.floor((box.y + box.moveY) / TILESIZE);
-        let mBoxMap = gMap[mBoxY * MAP_WIDTH + mBoxX];
+        let mBoxMap00 = gMap00[mBoxY * MAP_WIDTH + mBoxX];
+		let mBoxMap01 = gMap01[mBoxY * MAP_WIDTH + mBoxX];
         let mBoxSprite = gSprite[mBoxY * MAP_WIDTH + mBoxX];
 
 		let boxCollision = boxes.some(otherBox => 
             otherBox !== box && otherBox.x === mBoxX * TILESIZE && otherBox.y === mBoxY * TILESIZE
         );
 
-        if (mBoxMap > 3 || mBoxSprite !== 0 || boxCollision) { // 障害物または他のボックスがある場合
+        if (mBoxMap00 > 79 || mBoxMap01 > 79 || mBoxSprite !== 0 || boxCollision) { // 障害物または他のボックスがある場合
             box.moveX = 0;
             box.moveY = 0;
         }
@@ -762,7 +826,6 @@ function TickField() {
         StageClear();
     }
 }
-
 
 /*
 コンテンツのロード
