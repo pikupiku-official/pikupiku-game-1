@@ -34,6 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById("switch");
+    button.addEventListener('click', ChangeDirectionPikupikun);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById("save");
+    button.addEventListener('click', SaveGame);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById("load");
+    button.addEventListener('click', LoadGame);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
 	const buttonLeft = document.getElementById("buttonLeft");
 	buttonLeft.addEventListener('click', MoveLeft);
 });

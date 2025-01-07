@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Script-Type" content="text/javascript">
 <script type="text/javascript" src="main.js"></script>
+<script type="text/javascript" src="module_dataControl.js"></script>
 <script type="text/javascript" src="module_UIControl.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js"></script>
 <title>ぴくぴくんに見つかるな！</title>
@@ -13,7 +14,12 @@
 </head>
 <body class="fontTest" style="margin:0px;overflow:hidden" style="-webkit-font-smoothing: none;">
         
-      <div>ぴくぴくんに見つかるな！歩数<button id="buttonToggleBGM">BGM</button><button id="initializeEvent">やり直し</button><br><a>ああ</a><button id="buttonUp" class="buttonCross">↑</button>
+      <div>ぴくぴくんに見つかるな！歩数<button id="buttonToggleBGM">BGM</button>
+        <button id="initializeEvent">やり直し</button>
+        <button id="switch">スイッチ</button>
+        <button id="save">セーブ</button>
+        <button id="load">ロード</button>
+        <br><a>ああ</a><button id="buttonUp" class="buttonCross">↑</button>
         <br><button id="buttonLeft" class="buttonCross">←</button><button id="buttonDown" class="buttonCross">↓</button><button id="buttonRight" class="buttonCross">→</button>
        </div>
        <div> <canvas id="gameDisplay"></canvas><!--<image src = img/gameBoy.png id="gameBoy"></image>-->
