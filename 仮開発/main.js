@@ -25,11 +25,11 @@ const FONTSTYLE = "#FFFFFF";
 
 const gKey = new Uint8Array( 0x30 );	//	キー入力バッファ
 
-let stageNumber = 3;
-let MAP_HEIGHT = 10;					//	マップの高さ（タイル）
-let MAP_WIDTH = 12;					//	マップの幅（タイル）
-let START_X = 1;					//	開始位置X
-let START_Y = 9;					//	開始位置Y
+let stageNumber = 0;
+let MAP_HEIGHT = 7;					//	マップの高さ（タイル）
+let MAP_WIDTH = 9;					//	マップの幅（タイル）
+let START_X = 3;					//	開始位置X
+let START_Y = 7;					//	開始位置Y
 
 let isGameOver = false;
 
@@ -73,6 +73,8 @@ let stepCounter = 0;
 
 let indexFlag;
 let indexPikupikun;
+
+let isSwitched = 0;
 
 let keyboardDisabled = false;
 
@@ -423,14 +425,15 @@ function ProhibitEntry() {
 */
 
 function InitializeEvent() {
-	LoadData();
-	gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
-	gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
-	//gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
-	//gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
-	gAngle = initialPlayerAngle;
-	clear = 0;
-
+	if (!keyboardDisabled) {
+		LoadData();
+		gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
+		gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
+		//gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
+		//gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
+		gAngle = initialPlayerAngle;
+		clear = 0;
+	}
 }
 
 //	ぴくぴくんの視界探索（見つかったら死ぬぞ）
@@ -457,6 +460,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			if (gPlayerX == exploreX && gPlayerY == exploreY) {
 				GameOver();
 				let dx = 0;
+				g.drawImage(gImgSprite,
+					32, 384, 16, 16, 
+					WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX, 
+					HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY, 
+					16, 16
+					)
 				for(; dx < Math.ceil(WIDTH / TILESIZE); dx++) {
 					g.drawImage(gImgSprite, 
 						(BinaryOscillator(6, 3)) * 16 + Math.sign(dx) * 32, 80,
@@ -498,6 +507,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			if (gPlayerX == exploreX && gPlayerY == exploreY ) {
 				GameOver();
 				let dy = 0;
+				g.drawImage(gImgSprite,
+					0, 384, 16, 16, 
+					WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX, 
+					HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY, 
+					16, 16
+					)
 				for(; dy < Math.ceil(HEIGHT / TILESIZE); dy++) {
 					g.drawImage(gImgSprite, 
 						Math.sign(dy) * 32, 144 + BinaryOscillator(6, 3) * 16,
@@ -520,9 +535,9 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 		
 		}
 
-	if (directionPikupikun == 2) {
-			exploreX += TILESIZE
-			for (; exploreX <= 16; exploreX += TILESIZE) {
+	if (directionPikupikun == 2) {	
+		exploreX += TILESIZE;
+			for (; exploreX <= MAP_WIDTH * TILESIZE; exploreX += TILESIZE) {
 				// boxに到達した場合は終了する
 				let boxCollision = boxes.some(box =>
 					box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY);
@@ -538,18 +553,25 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				if (gPlayerX == exploreX && gPlayerY == exploreY) {
 					GameOver();
 					let dx = 0;
+					//	ガンギマリ描画
+					g.drawImage(gImgSprite,
+						16, 384, 16, 16, 
+						WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX, 
+						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY, 
+						16, 16
+						)
 					for(; dx < Math.ceil(WIDTH / TILESIZE); dx++) {
 						g.drawImage(gImgSprite, 
-							(BinaryOscillator(6, 3)) * 16 + Math.sign(dx) * 32, 80,
+							(BinaryOscillator(6, 3)) * 16 + Math.sign(dx) * 32, 208,
 							16, 32,
-							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX - TILESIZE * (dx + 1), 
+							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX + TILESIZE * (dx + 1), 
 							HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - 8,
 							16,32
 							)
 						g.drawImage(gImgSprite, 
-							16 + (((Math.sign(dx) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32 - Math.sign(dx) * 16, 48,
+							(((Math.sign(dx) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32 + Math.sign(dx) * 16, 176,
 							16, 32,
-							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX - TILESIZE * (dx + 1), 
+							WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX + TILESIZE * (dx + 1), 
 							HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - 8,
 							16,32
 						)
@@ -580,19 +602,25 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			if (gPlayerX == exploreX && gPlayerY == exploreY ) {
 				GameOver();
 				let dy = 0;
+				g.drawImage(gImgSprite,
+					48, 384, 16, 16, 
+					WIDTH/2 - gPlayerX - TILESIZE/2 + pikupikunX, 
+					HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY, 
+					16, 16
+					)
 				for(; dy < Math.ceil(HEIGHT / TILESIZE); dy++) {
 					g.drawImage(gImgSprite, 
-						Math.sign(dy) * 32, 144 + BinaryOscillator(6, 3) * 16,
+						Math.sign(dy) * 32, 272 + BinaryOscillator(6, 3) * 16,
 						32, 16,
 						WIDTH/2 - gPlayerX - TILESIZE + pikupikunX, 
-						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - TILESIZE * (dy + 1),
+						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY + TILESIZE * (dy + 1),
 						32,16
 						)
 					g.drawImage(gImgSprite, 
-						(((Math.sign(dy) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32, 128 - Math.sign(dy) * 16,
+						(((Math.sign(dy) - 1/2) * -1) + 1/2) * (BinaryOscillator(10, 5)) * 32, 240 + Math.sign(dy) * 16,
 						32, 16,
 						WIDTH/2 - gPlayerX - TILESIZE + pikupikunX, 
-						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY - TILESIZE * (dy + 1),
+						HEIGHT/2 - gPlayerY - TILESIZE/2 + pikupikunY + TILESIZE * (dy + 1),
 						32, 16
 						)
 				}
@@ -601,6 +629,20 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			}
 		}
 	}
+
+
+//	スイッチ
+function ChangeDirectionPikupikun() {
+	if (isSwitched === 3) {isSwitched = 0;} else {isSwitched += 1;}
+    for (let i = 0; i < directionPikupikun.length; i++) {
+        if (directionPikupikun[i] >= 0 && directionPikupikun[i] <= 3) {
+            directionPikupikun[i] = (directionPikupikun[i] + 1) % 4;
+        } else {
+            throw new Error("Array elements must be between 0 and 3.");
+        }
+    }
+}
+
 
 //	ゲームオーバー処理
 function GameOver() {
@@ -613,9 +655,9 @@ function GameOver() {
 
     // 5秒後に初期化
     setTimeout(() => {
+		EnableKeyboardInput(); // キー入力を再有効化
         InitializeEvent(); // ゲーム状態を初期化
         isGameOver = false; // ゲームオーバー状態をリセット
-        EnableKeyboardInput(); // キー入力を再有効化
 		PlayGameOver();
     }, 6000);
 }
