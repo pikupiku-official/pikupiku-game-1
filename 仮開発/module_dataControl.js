@@ -21,6 +21,6 @@ function LoadGame() {
     // gAngle = parseInt(localStorage.getItem('gAngle')) || 0;
     // boxes = parseInt(localStorage.getItem('boxes')) || 0;
     console.log("The data loaded. step: " + stepCounter + " stage: " + stageNumber + " player: " + gPlayerX + ", " + gPlayerY);
-    LoadData();
     InitializeEvent();
+
 }
