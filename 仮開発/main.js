@@ -1,9 +1,5 @@
 "use strict";
 
-//	Hello world(あさい)
-//	test 2nd
-//	stest nakamura
-// aiuoe
 /*
 declare variables and constants
 */
@@ -69,7 +65,10 @@ let keyState = { 'ArrowLeft': false, 'ArrowUp': false, 'ArrowRight': false, 'Arr
 let moveZeroTimer = null;		//	衝突z
 let collisionSoundTimer = null;
 let directionPikupikun;
+let directionPikupikunOld;
 let stepCounter = 0;
+
+let selectNext = 0;
 
 let indexFlag;
 let indexPikupikun;
@@ -81,7 +80,7 @@ let keyboardDisabled = false;
 let clear = 0;
 
 const gFileMap = "img/BG_01.png";			//	specify map-chip image
-const gFileSprite = "img/sprite.png";	//	specify player image
+const gFileSprite = "img/sprite0727.png";	//	specify player image
 const gFileBackground = "img/background.jpg"	// specify background image
 
 let fileSoundBGM = "sound/BGM/FC/FC_pikupikuTheme.mp3";
@@ -112,7 +111,8 @@ function LoadData() {
                 gMap00 = data[MAPKEY_00];
 				gMap01 = data[MAPKEY_01];
                 gSprite = data[SPRITE_KEY];
-                directionPikupikun = data.directionPikupikun[stageNumber];
+                directionPikupikunOld = data.directionPikupikun[stageNumber];
+				directionPikupikun = directionPikupikunOld.map(num => num % 4);
                 START_X = data.playerStart[stageNumber][0];
                 START_Y = data.playerStart[stageNumber][1];
                 indexFlag = gSprite.indexOf("F");
@@ -184,12 +184,23 @@ async function DrawMain() {
     }
 
 	//　render the player
-	g.drawImage(gImgSprite, 
-		gAngle * PLAYERWIDTH, 
-		( gFrame >> 4 & 1 ) * PLAYERHEIGHT + 304, 
-		PLAYERWIDTH, PLAYERHEIGHT,
-		(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2, 
-		PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
+	if (clear === 0 && !isGameOver) {
+		g.drawImage(gImgSprite,
+			gAngle * PLAYERWIDTH,
+			( gFrame >> 4 & 1 ) * PLAYERHEIGHT + 304,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
+	} else if (clear === 1 && !isGameOver) {
+		g.drawImage(gImgSprite,
+			( gFrame >> 4 & 1 ) * PLAYERWIDTH,
+			400,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
+	} else if (isGameOver) {
+		
+	}
 	
 		for (let dy = 0; dy < MAP_HEIGHT; dy++) {
 			for (let dx = 0; dx < MAP_WIDTH; dx++) {
@@ -210,6 +221,40 @@ async function DrawMain() {
 		} else {
    		console.error("indexPikupikun is not defined or not an array.");
 		}
+
+	if(clear === 1 && !isGameOver) {
+
+		for(let i = 0; i < 3; i++) {
+
+		g.drawImage(gImgSprite,
+			0, 432 + i * 32,	//	432 + i * 32で3段階のクリア画像を表示
+			64, PLAYERHEIGHT,
+			32 + i * 64, 32,
+			64, PLAYERHEIGHT);	//	プレイヤー画像の表示
+	}
+		for(let i = 0; i < 6; i++) {
+
+		g.drawImage(gImgSprite,
+		(i % 4) * 16, 528 + Math.floor(i / 4) * 32,	
+		16, PLAYERHEIGHT,
+		32 + i * 16, 128,
+		16, PLAYERHEIGHT);	
+
+		}
+
+				for(let i = 0; i < 6; i++) {
+
+		g.drawImage(gImgSprite,
+		(i % 4) * 16, 592 + Math.floor(i / 4) * 32,	
+		16, PLAYERHEIGHT,
+		138 + i * 16, 128,
+		16, PLAYERHEIGHT);	
+
+		}
+
+		g.fillRect(30 + selectNext * 106, 126, 96, 34)
+
+}
 
 /*
 *	debug elements
@@ -234,8 +279,10 @@ async function DrawMain() {
 	const paddedStage = String(stageNumber).padStart(2, '0'); // stageNumberを3桁ゼロパディング
 	const mapValue00 = gMap00[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
 	const mapValue01 = gMap01[Math.floor(gPlayerY / TILESIZE) * MAP_WIDTH + Math.floor(gPlayerX / TILESIZE)];
+	const indexFlagX = indexFlag % MAP_WIDTH;
+	const indexFlagY = Math.floor(indexFlag / MAP_WIDTH);
 
-	g.fillText(`x,y=${paddedX}, ${paddedY} 歩数=${paddedStep} s=${paddedStage} m=${mapValue00} ${isGameOver}`, 10, 203);
+	g.fillText(`x,y=${paddedX/16}, ${paddedY/16} 歩数=${paddedStep} s=${paddedStage} m=${mapValue00} ${isGameOver}` , 10, 203);
 
 
 }
@@ -271,7 +318,7 @@ function DrawSprite(g, x, y, idx) {
         g.fillStyle = "rgba(256, 0, 0, 0.5)";
         g.drawImage(gImgSprite, 16, 16, TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);
 
-        const direction = directionPikupikun[DrawSprite.pikupikuOrder % directionPikupikun.length];
+        const direction = directionPikupikun[DrawSprite.pikupikuOrder % directionPikupikun.length] % 4;
         if (direction === 0) {
             g.drawImage(gImgSprite,  
                 32 - (BinaryOscillator(80, 8) * 32), 
@@ -482,6 +529,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						16,32
 					)
 				}
+				g.drawImage(gImgSprite,
+			2 * PLAYERWIDTH,
+			400,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -529,6 +582,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						32, 16
 						)
 				}
+				g.drawImage(gImgSprite,
+			2 * PLAYERWIDTH,
+			400,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -576,6 +635,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 							16,32
 						)
 					}
+					g.drawImage(gImgSprite,
+			2 * PLAYERWIDTH,
+			400,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 					break;
 					}
 				}
@@ -624,6 +689,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						32, 16
 						)
 				}
+				g.drawImage(gImgSprite,
+			2 * PLAYERWIDTH,
+			400,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -634,12 +705,12 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 //	スイッチ
 function ChangeDirectionPikupikun() {
 	if (isSwitched === 3) {isSwitched = 0;} else {isSwitched += 1;}
-    for (let i = 0; i < directionPikupikun.length; i++) {
-        if (directionPikupikun[i] >= 0 && directionPikupikun[i] <= 3) {
+    for (let i = 0; i < directionPikupikunOld.length; i++) {
+        if (directionPikupikunOld[i] >= 0 && directionPikupikunOld[i] <= 3) {
             directionPikupikun[i] = (directionPikupikun[i] + 1) % 4;
-        } else {
-            throw new Error("Array elements must be between 0 and 3.");
-        }
+        } else if (directionPikupikunOld[i] >= 4 && directionPikupikunOld[i] <= 7){
+            directionPikupikun[i] = (directionPikupikun[i] + 3) % 4;
+        } else {throw new Error("Array elements must be between 0 and 7.");}
     }
 }
 
@@ -663,28 +734,106 @@ function GameOver() {
 }
 
 
-//	クリア処理
+//	クリア処理（さらに改善版）
 function StageClear() {
     clear = 1;
-    stageNumber++;
-    DisableKeyboardInput();
-    let sound = PlayStageClear(); // PlayStageClearからAudioオブジェクトを取得
-
-    // 音源の終了時にプレイヤーの座標をリセットするイベントリスナーを追加
-    sound.addEventListener('ended', () => {
-        console.log("Stage clear sound finished playing");
-        EnableKeyboardInput();
-
-        LoadData()
-            .then(() => {
-                InitializeEvent(); // LoadDataが完了した後に実行
-                console.log("Data loaded and initialized.");
-            })
-            .catch(error => {
-                console.error("Error during LoadData:", error);
-            });
-    });
+    if (stageNumber === 3) {
+        stageNumber = 0; // ステージをリセット
+    } else {
+        stageNumber++; // ステージを進める
+    }
+    
+    selectNext = 0;
+    let sound = PlayStageClear();
+    
+    // 衝突音のタイマーをクリア（念のため）
+    if (moveZeroTimer) {
+        clearTimeout(moveZeroTimer);
+        moveZeroTimer = null;
+    }
+    if (collisionSoundTimer) {
+        clearInterval(collisionSoundTimer);
+        collisionSoundTimer = null;
+    }
+    
+    // 既存のイベントリスナーを削除（重複を防ぐ）
+    if (stageClearKeyHandler) {
+        document.removeEventListener('keydown', stageClearKeyHandler);
+        document.removeEventListener('keyup', stageClearKeyHandler);
+    }
+    
+    // ステージクリア専用のキーハンドラーを作成
+    stageClearKeyHandler = function(e) {
+        if (clear !== 1) return; // クリア状態でない場合は無視
+        
+        if (e.type === 'keydown') {
+            // 左右キーでselectNextを切り替え
+            if (e.keyCode === 37 || e.keyCode === 39) { // 左矢印または右矢印
+                selectNext ^= 1;
+            }
+            
+            // Enterキーで次のステージへ
+            if (e.keyCode === 13 && selectNext === 0) {
+                console.log("Next stage selected");
+                finishStageClear();
+                
+                LoadData()
+                    .then(() => {
+                        InitializeEvent();
+                        console.log("Data loaded and initialized.");
+                    })
+                    .catch(error => {
+                        console.error("Error during LoadData:", error);
+                    });
+            }
+            
+            // 上キーでステージリセット
+            if (e.keyCode === 13 && selectNext === 1) { // 上矢印
+                console.log("Stage reset selected");
+                stageNumber = 0; // ステージをリセット
+                finishStageClear();
+                
+                LoadData()
+                    .then(() => {
+                        InitializeEvent();
+                        console.log("Stage reset and initialized.");
+                    })
+                    .catch(error => {
+                        console.error("Error during LoadData:", error);
+                    });
+            }
+        }
+    };
+    
+    // イベントリスナーを追加
+    document.addEventListener('keydown', stageClearKeyHandler);
+    document.addEventListener('keyup', stageClearKeyHandler);
 }
+
+// ステージクリア終了時の共通処理
+function finishStageClear() {
+    clear = 0;
+    
+    // イベントリスナーを削除
+    if (stageClearKeyHandler) {
+        document.removeEventListener('keydown', stageClearKeyHandler);
+        document.removeEventListener('keyup', stageClearKeyHandler);
+        stageClearKeyHandler = null;
+    }
+    
+    // キー状態をリセット
+    for (let i = 0; i < gKey.length; i++) {
+        gKey[i] = 0;
+    }
+    
+    // keyState もリセット
+    keyState = { 'ArrowLeft': false, 'ArrowUp': false, 'ArrowRight': false, 'ArrowDown': false };
+}
+
+// グローバル変数としてハンドラーを保持
+let stageClearKeyHandler = null;
+
+
 
 
 /*
@@ -704,7 +853,35 @@ function EnableKeyboardInput() {
 	}
 
 //	矢印キーの状態をチェックし、適宜音を制御する関数
+//	矢印キーの状態をチェックし、適宜音を制御する関数（修正版）
 function checkKeyAndMove() {
+    // クリア画面の場合は衝突音を再生しない
+    if (clear === 1) {
+        // タイマーをクリアして音を停止
+        if (moveZeroTimer) {
+            clearTimeout(moveZeroTimer);
+            moveZeroTimer = null;
+        }
+        if (collisionSoundTimer) {
+            clearInterval(collisionSoundTimer);
+            collisionSoundTimer = null;
+        }
+        return;
+    }
+    
+    // ゲームオーバー状態でも衝突音を再生しない
+    if (isGameOver) {
+        if (moveZeroTimer) {
+            clearTimeout(moveZeroTimer);
+            moveZeroTimer = null;
+        }
+        if (collisionSoundTimer) {
+            clearInterval(collisionSoundTimer);
+            collisionSoundTimer = null;
+        }
+        return;
+    }
+
     const arrowKeys = ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'];
     let anyArrowKeyPressed = arrowKeys.some(key => keyState[key]);
 
@@ -729,7 +906,6 @@ function checkKeyAndMove() {
         }
     }
 }
-
 
 function MoveLeft() {
 	gKey[ 37 ] = true;
@@ -762,6 +938,10 @@ function MoveDown() {
 //	キー入力処理(上下左右)　この関数長すぎるから別のモジュールに移管したほうが良い
 function TickField() {
     // プレイヤーが移動中、または入力が無効の場合は何もしない
+
+    if (clear === 1) {
+        return;
+    }
 
 	if (gPlayerMoveX !== 0 || gPlayerMoveY !== 0 || keyboardDisabled || boxes.some(box => box.moveX !== 0 || box.moveY !== 0)) {
 	} else if (gKey[37]) { // 左
@@ -865,7 +1045,7 @@ function TickField() {
     }
 
     // クリア処理
-    if (clear === 0 && gPlayerX === indexFlag % MAP_WIDTH * TILESIZE && gPlayerY === Math.floor(indexFlag / MAP_HEIGHT) * TILESIZE) {
+    if (clear === 0 && gPlayerX / TILESIZE === indexFlag % MAP_WIDTH && gPlayerY / TILESIZE=== Math.floor(indexFlag / MAP_WIDTH)) {
         StageClear();
     }
 }
