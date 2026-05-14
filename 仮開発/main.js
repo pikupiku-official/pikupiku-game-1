@@ -341,7 +341,30 @@ function DrawSprite(g, x, y, idx) {
                 TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);
         }
         DrawSprite.pikupikuOrder++; // 次のピクピクンに進む
+    } 
+	/*
+	else if (idx === 80) {
+        // やぶの描画
+		g.drawImage(gImgSprite, 
+			0, 656 + ( gFrame >> 4 & 1 ) * TILESIZE, 
+			TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);	//	プレイヤー画像の表示
+    } else if (idx === 81) {
+        // やぶの描画
+		g.drawImage(gImgSprite, 5
+			16, 656 + ( gFrame >> 4 & 1 ) * TILESIZE, 
+			TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);	//	プレイヤー画像の表示
+    } else if (idx === 82) {
+        // やぶの描画
+		g.drawImage(gImgSprite, 
+			32, 656 + ( gFrame >> 4 & 1 ) * TILESIZE, 
+			TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);	//	プレイヤー画像の表示
+    } else if (idx === 83) {
+        // やぶの描画
+		g.drawImage(gImgSprite, 
+			48, 656 + ( gFrame >> 4 & 1 ) * TILESIZE, 
+			TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);	//	プレイヤー画像の表示
     }
+	*/
 }
 //	レーザー表示
 function DrawLaser() {
