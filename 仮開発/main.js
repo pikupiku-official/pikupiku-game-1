@@ -78,10 +78,16 @@ let isSwitched = 0;
 let keyboardDisabled = false;
 
 let clear = 0;
+let gameOverStartTime = null;
+let gameOverTimer = null;
+let gameOverSpriteX = 0;
+let gameOverSpriteY = 656;
+let lastDirectionalInputTime = null;
+let showDebugOverlay = false;
 
 const gFileMap = "img/BG_01.png";			//	specify map-chip image
 const gFileSprite = "img/sprite0727.png";	//	specify player image
-const gFileBackground = "img/background.jpg"	// specify background image
+const gFileBackground = "img/background.png"	// specify background image
 
 let fileSoundBGM = "sound/BGM/FC/FC_pikupikuTheme.mp3";
 const fileSoundCollision = "sound/SE/collision.mp3";
@@ -89,6 +95,17 @@ const fileSoundDraggingBox = "sound/SE/draggingBox.mp3";
 const fileSoundStageClear = "sound/SE/stageClear.mp3";
 const fileSoundGameOver = "sound/SE/gameOver.mp3";
 const fileSoundLaser = "sound/SE/laser.mp3";
+
+function StopAudio(audio) {
+	if (!audio) return;
+	audio.pause();
+	audio.currentTime = 0;
+}
+
+function DebugFillRect(g, x, y, width, height) {
+	if (!showDebugOverlay) return;
+	g.fillRect(x, y, width, height);
+}
 
 /*
 define functions
@@ -198,8 +215,6 @@ async function DrawMain() {
 			PLAYERWIDTH, PLAYERHEIGHT,
 			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
 			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
-	} else if (isGameOver) {
-		
 	}
 	
 		for (let dy = 0; dy < MAP_HEIGHT; dy++) {
@@ -222,6 +237,19 @@ async function DrawMain() {
    		console.error("indexPikupikun is not defined or not an array.");
 		}
 
+	if(isGameOver) {
+		const elapsedGameOver = gameOverStartTime === null ? 0 : performance.now() - gameOverStartTime;
+		const spriteX = elapsedGameOver < 3000 ? gameOverSpriteX : 32;
+		const spriteY = elapsedGameOver < 3000 ? gameOverSpriteY : 400;
+
+		g.drawImage(gImgSprite,
+			spriteX,
+			spriteY,
+			PLAYERWIDTH, PLAYERHEIGHT,
+			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
+			PLAYERWIDTH, PLAYERHEIGHT);
+	}
+
 	if(clear === 1 && !isGameOver) {
 
 		for(let i = 0; i < 3; i++) {
@@ -232,27 +260,29 @@ async function DrawMain() {
 			32 + i * 64, 32,
 			64, PLAYERHEIGHT);	//	プレイヤー画像の表示
 	}
+		g.save();
+		g.filter = selectNext === 0 ? "none" : "grayscale(1)";
 		for(let i = 0; i < 6; i++) {
-
-		g.drawImage(gImgSprite,
-		(i % 4) * 16, 528 + Math.floor(i / 4) * 32,	
-		16, PLAYERHEIGHT,
-		32 + i * 16, 128,
-		16, PLAYERHEIGHT);	
-
+			g.drawImage(gImgSprite,
+			(i % 4) * 16, 528 + Math.floor(i / 4) * 32,	
+			16, PLAYERHEIGHT,
+			32 + i * 16, 128,
+			16, PLAYERHEIGHT);	
 		}
+		g.restore();
 
-				for(let i = 0; i < 6; i++) {
-
-		g.drawImage(gImgSprite,
-		(i % 4) * 16, 592 + Math.floor(i / 4) * 32,	
-		16, PLAYERHEIGHT,
-		138 + i * 16, 128,
-		16, PLAYERHEIGHT);	
-
+		g.save();
+		g.filter = selectNext === 1 ? "none" : "grayscale(1)";
+		for(let i = 0; i < 6; i++) {
+			g.drawImage(gImgSprite,
+			(i % 4) * 16, 592 + Math.floor(i / 4) * 32,	
+			16, PLAYERHEIGHT,
+			138 + i * 16, 128,
+			16, PLAYERHEIGHT);	
 		}
+		g.restore();
 
-		g.fillRect(30 + selectNext * 106, 126, 96, 34)
+		DebugFillRect(g, 30 + selectNext * 106, 126, 96, 34)
 
 }
 
@@ -267,9 +297,10 @@ async function DrawMain() {
         g.font = "16px sans-serif"; // フォールバックとしてデフォルトフォントを使用
     }    
 
+	if (showDebugOverlay) {
 	//	set window color
 	g.fillStyle = WINDOWSTYLE;
-	g.fillRect(4, 189, 248, 20);
+		DebugFillRect(g, 4, 189, 248, 20);
 
 	g.fillStyle = FONTSTYLE;
 
@@ -288,6 +319,7 @@ async function DrawMain() {
 }
 
 //	マップチップ生成
+}
 function DrawTile(g, x, y, idx) {
 	const ix = (idx % TILECOLUMN) * TILESIZE; 	//　タイルのindexからx座標を取得
 	const iy = Math.floor(idx / TILECOLUMN) * TILESIZE;		//　タイルのindexからy座標を取得
@@ -312,7 +344,7 @@ function DrawSprite(g, x, y, idx) {
 			TILESIZE, TILESIZE, x, y, TILESIZE, TILESIZE);	//	プレイヤー画像の表示
 	
 		g.fillStyle = "rgba(0, 256, 256, 0.5)";
-		g.fillRect(x,y,TILESIZE,TILESIZE)
+		DebugFillRect(g, x, y, TILESIZE, TILESIZE)
     } else if (idx === "P") {
         // pikupikun の描画
         g.fillStyle = "rgba(256, 0, 0, 0.5)";
@@ -417,6 +449,7 @@ function WmSize() {
 
     const g = ca.getContext("2d");
     g.imageSmoothingEnabled = g.msImageSmoothingEnabled = false; // アンチエイリアス無効化
+    g.setTransform(1, 0, 0, 1, 0, 0);
     g.scale(scale, scale); // 高解像度に対応
 }
 
@@ -458,9 +491,8 @@ function PlayLaser() {
 	}
 
 function PlayGameOver() {
-	soundGameOver.currentTime = 0; // 再生位置を先頭にリセット
-	soundGameOver.volume = 0.3;
-    soundGameOver.play(); // 再生開始
+	StopAudio(soundLaser);
+	StopAudio(soundGameOver);
     return soundGameOver; // Audioオブジェクトを返す
 	}
 
@@ -494,14 +526,35 @@ function ProhibitEntry() {
 イベント関数
 */
 
+function RecordDirectionalInput() {
+	lastDirectionalInputTime = performance.now();
+}
+
 function InitializeEvent() {
 	if (!keyboardDisabled) {
+		gPlayerMoveX = 0;
+		gPlayerMoveY = 0;
+		for (let i = 0; i < gKey.length; i++) {
+			gKey[i] = 0;
+		}
+		keyState = { 'ArrowLeft': false, 'ArrowUp': false, 'ArrowRight': false, 'ArrowDown': false };
+		for (let box of boxes) {
+			box.moveX = 0;
+			box.moveY = 0;
+		}
+		if (gameOverTimer !== null) {
+			clearTimeout(gameOverTimer);
+			gameOverTimer = null;
+		}
 		LoadData();
 		gPlayerX = START_X * TILESIZE;	//	プレイヤー座標X
 		gPlayerY = START_Y * TILESIZE;	//	プレイヤー座標Y
 		//gBoxX = BOX_X * TILESIZE;	//	プレイヤー座標X
 		//gBoxY = BOX_Y * TILESIZE;	//	プレイヤー座標Y
 		gAngle = initialPlayerAngle;
+		lastDirectionalInputTime = null;
+		gameOverStartTime = null;
+		isGameOver = false;
 		clear = 0;
 	}
 }
@@ -523,7 +576,7 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				break;
 			}
 
-			if (!isGameOver) {g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
+			if (!isGameOver) {DebugFillRect(g, WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
 			}
 
 			// playerに到達した場合、位置を返却する
@@ -552,12 +605,6 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						16,32
 					)
 				}
-				g.drawImage(gImgSprite,
-			2 * PLAYERWIDTH,
-			400,
-			PLAYERWIDTH, PLAYERHEIGHT,
-			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
-			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -575,7 +622,7 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			}
 
 			if (!isGameOver) {
-				g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
+				DebugFillRect(g, WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
 			TILESIZE, TILESIZE)
 				}
 			
@@ -605,12 +652,6 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						32, 16
 						)
 				}
-				g.drawImage(gImgSprite,
-			2 * PLAYERWIDTH,
-			400,
-			PLAYERWIDTH, PLAYERHEIGHT,
-			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
-			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -628,7 +669,7 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 					break;
 				}
 	
-				if (!isGameOver) {g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
+				if (!isGameOver) {DebugFillRect(g, WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2, TILESIZE, TILESIZE)
 				}
 	
 				// playerに到達した場合、位置を返却する
@@ -658,12 +699,6 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 							16,32
 						)
 					}
-					g.drawImage(gImgSprite,
-			2 * PLAYERWIDTH,
-			400,
-			PLAYERWIDTH, PLAYERHEIGHT,
-			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
-			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 					break;
 					}
 				}
@@ -682,7 +717,7 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			}
 
 			if (!isGameOver) {
-				g.fillRect(WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
+				DebugFillRect(g, WIDTH/2 - gPlayerX - TILESIZE/2 + exploreX, HEIGHT/2 - gPlayerY + exploreY - TILESIZE/2,
 			TILESIZE, TILESIZE)
 				}
 			
@@ -712,12 +747,6 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 						32, 16
 						)
 				}
-				g.drawImage(gImgSprite,
-			2 * PLAYERWIDTH,
-			400,
-			PLAYERWIDTH, PLAYERHEIGHT,
-			(WIDTH - PLAYERWIDTH * 2 + TILESIZE)/2, (HEIGHT - PLAYERHEIGHT * 2 + TILESIZE)/2,
-			PLAYERWIDTH, PLAYERHEIGHT);	//	プレイヤー画像の表示
 				break;
 				}
 			}
@@ -742,22 +771,47 @@ function ChangeDirectionPikupikun() {
 function GameOver() {
     if (isGameOver) return; // 二重実行を防止
     isGameOver = true;
+    gameOverStartTime = performance.now();
+    gameOverSpriteX = gAngle * PLAYERWIDTH;
+    gameOverSpriteY = ( gFrame >> 4 & 1 ) * PLAYERHEIGHT + 656;
 
     DisableKeyboardInput(); // キー入力を無効化
 
 	PlayLaser();
 
     // 5秒後に初期化
-    setTimeout(() => {
+    gameOverTimer = setTimeout(() => {
+		if (!isGameOver) return;
+		gameOverTimer = null;
 		EnableKeyboardInput(); // キー入力を再有効化
         InitializeEvent(); // ゲーム状態を初期化
         isGameOver = false; // ゲームオーバー状態をリセット
+		gameOverStartTime = null;
+		gameOverSpriteX = 0;
+		gameOverSpriteY = 656;
 		PlayGameOver();
     }, 6000);
 }
 
 
 //	クリア処理（さらに改善版）
+function FinishGameOver() {
+	if (!isGameOver) return;
+	if (gameOverTimer !== null) {
+		clearTimeout(gameOverTimer);
+		gameOverTimer = null;
+	}
+
+	StopAudio(soundLaser);
+	StopAudio(soundGameOver);
+	EnableKeyboardInput();
+    InitializeEvent();
+    isGameOver = false;
+	gameOverStartTime = null;
+	gameOverSpriteX = 0;
+	gameOverSpriteY = 656;
+}
+
 function StageClear() {
     clear = 1;
     if (stageNumber === 3) {
@@ -835,6 +889,7 @@ function StageClear() {
 
 // ステージクリア終了時の共通処理
 function finishStageClear() {
+    StopAudio(soundStageClear);
     clear = 0;
     
     // イベントリスナーを削除
@@ -931,6 +986,7 @@ function checkKeyAndMove() {
 }
 
 function MoveLeft() {
+	RecordDirectionalInput();
 	gKey[ 37 ] = true;
 	setTimeout(() => {
         gKey[ 37 ] = false;
@@ -938,6 +994,7 @@ function MoveLeft() {
 }
 
 function MoveUp() {
+	RecordDirectionalInput();
 	gKey[ 38 ] = true;
 	setTimeout(() => {
         gKey[ 38 ] = false;
@@ -945,6 +1002,7 @@ function MoveUp() {
 }
 
 function MoveRight() {
+	RecordDirectionalInput();
 	gKey[ 39 ] = true;
 	setTimeout(() => {
         gKey[ 39 ] = false;
@@ -952,6 +1010,7 @@ function MoveRight() {
 }
 
 function MoveDown() {
+	RecordDirectionalInput();
 	gKey[ 40 ] = true;
 	setTimeout(() => {
         gKey[ 40 ] = false;
@@ -1146,6 +1205,44 @@ window.onkeydown = function( ev )
 	let		c = ev.keyCode;			//	キーコード取得
 
 	gKey[ c ] = 1;
+	if (isGameOver && c === 13) {
+		ev.preventDefault();
+		FinishGameOver();
+		return;
+	}
+
+	if (c >= 37 && c <= 40) {
+		RecordDirectionalInput();
+	}
+
+	if (ev.repeat) {
+		return;
+	}
+
+	switch (ev.key.toLowerCase()) {
+		case "d":
+			ev.preventDefault();
+			showDebugOverlay = !showDebugOverlay;
+			break;
+		case "r":
+			ev.preventDefault();
+			InitializeEvent();
+			break;
+		case "b":
+			ev.preventDefault();
+			toggleBGM();
+			break;
+		case "s":
+			ev.preventDefault();
+			SaveGame();
+			break;
+		case "l":
+			ev.preventDefault();
+			LoadGame().then(() => {
+				lastDirectionalInputTime = null;
+			});
+			break;
+	}
 }
 
 //	キー入力(UP)イベント
@@ -1182,7 +1279,6 @@ window.onload = async function () {
     gScreen = document.createElement("canvas"); // 仮想画面生成
     gScreen.width = WIDTH; // 仮想画面の幅
     gScreen.height = HEIGHT; // 仮想画面の高さ
-    document.body.appendChild(gScreen);
 
     // フォントを動的に設定
     const adjustedFontSize = Math.floor(24 / scale); // 16pxを基準にスケール調整
