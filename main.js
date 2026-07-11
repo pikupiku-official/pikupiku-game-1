@@ -21,7 +21,7 @@ const FONTSTYLE = "#FFFFFF";
 
 const gKey = new Uint8Array( 0x30 );	//	キー入力バッファ
 
-let stageNumber = 0;
+let stageNumber = 4;
 let MAP_HEIGHT = 7;					//	マップの高さ（タイル）
 let MAP_WIDTH = 9;					//	マップの幅（タイル）
 let START_X = 3;					//	開始位置X
