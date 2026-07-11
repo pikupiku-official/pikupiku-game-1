@@ -21,7 +21,7 @@ const FONTSTYLE = "#FFFFFF";
 
 const gKey = new Uint8Array( 0x30 );	//	キー入力バッファ
 
-let stageNumber = 4;
+let stageNumber = 0;
 let MAP_HEIGHT = 7;					//	マップの高さ（タイル）
 let MAP_WIDTH = 9;					//	マップの幅（タイル）
 let START_X = 3;					//	開始位置X
@@ -83,6 +83,10 @@ let gameOverStartTime = null;
 let gameOverTimer = null;
 let gameOverSpriteX = 0;
 let gameOverSpriteY = 656;
+let gameOverFrameOffset = 0;
+const GAME_OVER_ALIVE_SPRITE_Y = 304;
+const GAME_OVER_CHARRED_SPRITE_Y = 656;
+const GAME_OVER_FLICKER_INTERVAL = 90;
 let lastDirectionalInputTime = null;
 let showDebugOverlay = false;
 
@@ -241,8 +245,13 @@ async function DrawMain() {
 
 	if(isGameOver) {
 		const elapsedGameOver = gameOverStartTime === null ? 0 : performance.now() - gameOverStartTime;
-		const spriteX = elapsedGameOver < 3000 ? gameOverSpriteX : 32;
-		const spriteY = elapsedGameOver < 3000 ? gameOverSpriteY : 400;
+		const isSkeleton = elapsedGameOver >=1000;
+		const showCharred = !isSkeleton && Math.floor(elapsedGameOver / GAME_OVER_FLICKER_INTERVAL) % 2 === 1;
+		const spriteX = isSkeleton ? 32 : gameOverSpriteX;
+		const spriteY = isSkeleton
+			? 400
+			: (showCharred ? GAME_OVER_CHARRED_SPRITE_Y : GAME_OVER_ALIVE_SPRITE_Y)
+				+ gameOverFrameOffset;
 
 		g.drawImage(gImgSprite,
 			spriteX,
@@ -788,7 +797,8 @@ function GameOver() {
     isGameOver = true;
     gameOverStartTime = performance.now();
     gameOverSpriteX = gAngle * PLAYERWIDTH;
-    gameOverSpriteY = ( gFrame >> 4 & 1 ) * PLAYERHEIGHT + 656;
+    gameOverFrameOffset = (gFrame >> 4 & 1) * PLAYERHEIGHT;
+    gameOverSpriteY = gameOverFrameOffset + GAME_OVER_CHARRED_SPRITE_Y;
 
     DisableKeyboardInput(); // キー入力を無効化
 
@@ -804,6 +814,7 @@ function GameOver() {
 		gameOverStartTime = null;
 		gameOverSpriteX = 0;
 		gameOverSpriteY = 656;
+		gameOverFrameOffset = 0;
 		PlayGameOver();
     }, 6000);
 }
@@ -825,6 +836,7 @@ function FinishGameOver() {
 	gameOverStartTime = null;
 	gameOverSpriteX = 0;
 	gameOverSpriteY = 656;
+	gameOverFrameOffset = 0;
 }
 
 function StageClear() {
