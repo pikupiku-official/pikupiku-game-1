@@ -565,6 +565,12 @@ function InitializeEvent() {
 }
 
 //	ぴくぴくんの視界探索（見つかったら死ぬぞ）
+function IsPikupikunAt(tileX, tileY) {
+	if (!Array.isArray(indexPikupikun)) return false;
+	const tileIndex = tileY * MAP_WIDTH + tileX;
+	return indexPikupikun.includes(tileIndex);
+}
+
 function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 	const g = gScreen.getContext("2d");
 	g.fillstyle = "rgba(60, 60, 0, 0.8)";
@@ -576,8 +582,9 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			// boxに到達した場合は終了する
 			let boxCollision = boxes.some(box =>
 				box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY);
+			let pikupikunCollision = IsPikupikunAt(exploreX / TILESIZE, exploreY / TILESIZE);
 
-			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+			if (boxCollision || pikupikunCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 				break;
 			}
 
@@ -622,7 +629,8 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			let boxCollision = boxes.some(box => 
 				box.y >= exploreY - TILESIZE / 2 && box.y <= exploreY + TILESIZE / 2 && box.x === exploreX
 			);
-			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+			let pikupikunCollision = IsPikupikunAt(exploreX / TILESIZE, exploreY / TILESIZE);
+			if (boxCollision || pikupikunCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 				break;
 			}
 
@@ -669,8 +677,9 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 				// boxに到達した場合は終了する
 				let boxCollision = boxes.some(box =>
 					box.x >= exploreX - TILESIZE / 2 && box.x <= exploreX + TILESIZE / 2 && box.y === exploreY);
+				let pikupikunCollision = IsPikupikunAt(exploreX / TILESIZE, exploreY / TILESIZE);
 	
-				if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+				if (boxCollision || pikupikunCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 					break;
 				}
 	
@@ -717,7 +726,8 @@ function ExploreSquare(directionPikupikun, pikupikunX, pikupikunY) {
 			let boxCollision = boxes.some(box => 
 				box.y >= exploreY - TILESIZE / 2 && box.y <= exploreY + TILESIZE / 2 && box.x === exploreX
 			);
-			if (boxCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
+			let pikupikunCollision = IsPikupikunAt(exploreX / TILESIZE, exploreY / TILESIZE);
+			if (boxCollision || pikupikunCollision || gMap00[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79 ||  gMap01[exploreX/TILESIZE + exploreY * MAP_WIDTH / TILESIZE] > 79) {
 				break;
 			}
 
@@ -818,8 +828,9 @@ function FinishGameOver() {
 }
 
 function StageClear() {
+    if (clear === 1 || stageTransitioning) return;
     clear = 1;
-    if (stageNumber === 3) {
+    if (stageNumber === 5) {
         stageNumber = 0; // ステージをリセット
     } else {
         stageNumber++; // ステージを進める
@@ -857,16 +868,31 @@ function StageClear() {
             
             // Enterキーで次のステージへ
             if (e.keyCode === 13 && selectNext === 0) {
+                e.preventDefault();
+                if (stageTransitioning) return;
                 console.log("Next stage selected");
                 finishStageClear();
-                
+                stageTransitioning = true;
+                DisableKeyboardInput();
                 LoadData()
                     .then(() => {
-                        InitializeEvent();
+                        gPlayerMoveX = 0;
+                        gPlayerMoveY = 0;
+                        gPlayerX = START_X * TILESIZE;
+                        gPlayerY = START_Y * TILESIZE;
+                        gAngle = initialPlayerAngle;
+                        lastDirectionalInputTime = null;
+                        clear = 0;
+                        EnableKeyboardInput();
                         console.log("Data loaded and initialized.");
                     })
                     .catch(error => {
-                        console.error("Error during LoadData:", error);
+                        console.error("Error during stage transition:", error);
+                        clear = 1;
+                        EnableKeyboardInput();
+                    })
+                    .finally(() => {
+                        stageTransitioning = false;
                     });
             }
             
@@ -907,6 +933,7 @@ function finishStageClear() {
 
 // グローバル変数としてハンドラーを保持
 let stageClearKeyHandler = null;
+let stageTransitioning = false;
 
 
 
