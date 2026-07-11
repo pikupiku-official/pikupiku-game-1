@@ -535,6 +535,7 @@ function RecordDirectionalInput() {
 }
 
 function InitializeEvent() {
+	if (clear === 1) return;
 	if (!keyboardDisabled) {
 		gPlayerMoveX = 0;
 		gPlayerMoveY = 0;
@@ -1236,7 +1237,7 @@ window.onkeydown = function( ev )
 			break;
 		case "r":
 			ev.preventDefault();
-			InitializeEvent();
+			if (clear !== 1) InitializeEvent();
 			break;
 		case "b":
 			ev.preventDefault();
