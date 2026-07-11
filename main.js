@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 /*
 declare variables and constants
@@ -10,7 +10,7 @@ let globalFontStyle = null;
 
 const HEIGHT = 224;					//	仮想画面の高さ（ピクセル）
 const WIDTH = 256;					//	仮装画面の幅（ピクセル） 
-const SCROLL = 2;
+const SCROLL = 3;
 const SMOOTH = 0;					//	小さい画像もボカさないでね！
 const TILECOLUMN = 4;				//	マップチップの行数
 const TILESIZE = 16;				//	タイルのピクセル数
@@ -64,6 +64,7 @@ let soundLaser;
 let keyState = { 'ArrowLeft': false, 'ArrowUp': false, 'ArrowRight': false, 'ArrowDown': false };
 let moveZeroTimer = null;		//	衝突z
 let collisionSoundTimer = null;
+let blockedMovement = false;
 let directionPikupikun;
 let directionPikupikunOld;
 let stepCounter = 0;
@@ -147,7 +148,8 @@ function LoadData() {
                         x: boxStartData[i] * TILESIZE,
                         y: boxStartData[i + 1] * TILESIZE,
                         moveX: 0,
-                        moveY: 0
+                        moveY: 0,
+                        pushLocked: false
                     });
                 }
 
@@ -493,6 +495,8 @@ function PlayLaser() {
 function PlayGameOver() {
 	StopAudio(soundLaser);
 	StopAudio(soundGameOver);
+	soundGameOver.currentTime = 0;
+	soundGameOver.play();
     return soundGameOver; // Audioオブジェクトを返す
 	}
 
@@ -822,6 +826,7 @@ function StageClear() {
     
     selectNext = 0;
     let sound = PlayStageClear();
+	if (typeof stopBGMForStageClear === "function") stopBGMForStageClear(sound);
     
     // 衝突音のタイマーをクリア（念のため）
     if (moveZeroTimer) {
@@ -845,8 +850,8 @@ function StageClear() {
         
         if (e.type === 'keydown') {
             // 左右キーでselectNextを切り替え
-            if (e.keyCode === 37 || e.keyCode === 39) { // 左矢印または右矢印
-                selectNext ^= 1;
+            if (e.keyCode === 37 || e.keyCode === 39) { // 左右を選択先へ直接対応
+                selectNext = e.keyCode === 37 ? 0 : 1;
             }
             
             // Enterキーで次のステージへ
@@ -864,20 +869,10 @@ function StageClear() {
                     });
             }
             
-            // 上キーでステージリセット
+            // 右側の「やり直し」はクリア画面では無効
             if (e.keyCode === 13 && selectNext === 1) { // 上矢印
-                console.log("Stage reset selected");
-                stageNumber = 0; // ステージをリセット
-                finishStageClear();
-                
-                LoadData()
-                    .then(() => {
-                        InitializeEvent();
-                        console.log("Stage reset and initialized.");
-                    })
-                    .catch(error => {
-                        console.error("Error during LoadData:", error);
-                    });
+                e.preventDefault();
+                return;
             }
         }
     };
@@ -890,6 +885,7 @@ function StageClear() {
 // ステージクリア終了時の共通処理
 function finishStageClear() {
     StopAudio(soundStageClear);
+	if (typeof resumeBGMAfterStageClear === "function") resumeBGMAfterStageClear();
     clear = 0;
     
     // イベントリスナーを削除
@@ -966,10 +962,10 @@ function checkKeyAndMove() {
     // すべてのボックスの移動状態を確認
     let allBoxesStationary = boxes.every(box => box.moveX === 0 && box.moveY === 0);
 
-    if (anyArrowKeyPressed && gPlayerMoveX === 0 && gPlayerMoveY === 0 && allBoxesStationary && !keyboardDisabled) {
+    if (blockedMovement && anyArrowKeyPressed && !keyboardDisabled) {
         if (!moveZeroTimer) {
+            PlaySoundCollision();
             moveZeroTimer = setTimeout(() => {
-                PlaySoundCollision();
                 collisionSoundTimer = setInterval(PlaySoundCollision, 1000);
             }, 200);
         }
@@ -1024,6 +1020,7 @@ function TickField() {
     if (clear === 1) {
         return;
     }
+	blockedMovement = false;
 
 	if (gPlayerMoveX !== 0 || gPlayerMoveY !== 0 || keyboardDisabled || boxes.some(box => box.moveX !== 0 || box.moveY !== 0)) {
 	} else if (gKey[37]) { // 左
@@ -1060,6 +1057,7 @@ function TickField() {
 
 
 
+    let playerBlockedByTile = false;
     // 移動後のタイル座標を計算
     let mPlayerX = Math.floor((gPlayerX + gPlayerMoveX) / TILESIZE);
     let mPlayerY = Math.floor((gPlayerY + gPlayerMoveY) / TILESIZE);
@@ -1070,6 +1068,7 @@ function TickField() {
     // 壁や敵、ボックスに進入できないようにする
 
 		if (mPlayerMap00 > 79 || mPlayerMap01 > 79 || mPlayerSprite === "P" || boxes.some(box => box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) || boxes.some(box => box.moveX !== 0 || box.moveY !== 0)) {
+			playerBlockedByTile = mPlayerMap00 > 79 || mPlayerMap01 > 79 || mPlayerSprite === "P";
         	ProhibitEntry();
 			if(boxes.some(box => box.moveX === TILESIZE || box.moveY === TILESIZE)){}
 			//stepCounter--; // 進入できない場合は歩数を元に戻す
@@ -1079,21 +1078,26 @@ function TickField() {
 	
 
     // プレイヤー座標を更新
-    gPlayerX += Math.sign(gPlayerMoveX) * SCROLL;
-    gPlayerY += Math.sign(gPlayerMoveY) * SCROLL;
-    gPlayerMoveX -= Math.sign(gPlayerMoveX) * SCROLL;
-    gPlayerMoveY -= Math.sign(gPlayerMoveY) * SCROLL;
+    if (playerBlockedByTile) blockedMovement = true;
+    const playerStepX = Math.min(SCROLL, Math.abs(gPlayerMoveX));
+    const playerStepY = Math.min(SCROLL, Math.abs(gPlayerMoveY));
+    gPlayerX += Math.sign(gPlayerMoveX) * playerStepX;
+    gPlayerY += Math.sign(gPlayerMoveY) * playerStepY;
+    gPlayerMoveX -= Math.sign(gPlayerMoveX) * playerStepX;
+    gPlayerMoveY -= Math.sign(gPlayerMoveY) * playerStepY;
 
     // ボックスがある場合の処理
     for (let box of boxes) {
         if (box.x === mPlayerX * TILESIZE && box.y === mPlayerY * TILESIZE) {
             ProhibitEntry(); // プレイヤーの移動を禁止
             // ボックスが動いていない場合のみ移動を設定
-            if (box.moveX === 0 && box.moveY === 0) {
+            if (box.moveX === 0 && box.moveY === 0 && !box.pushLocked) {
                 if (gKey[37]) { box.moveX = -TILESIZE; } // 左
                 else if (gKey[38]) { box.moveY = -TILESIZE;} // 上
                 else if (gKey[39]) { box.moveX = TILESIZE; } // 右
                 else if (gKey[40]) { box.moveY = TILESIZE; } // 下
+				if (box.moveX !== 0 || box.moveY !== 0) { box.pushLocked = true; box.soundPending = true; }
+				
 				
             }
 			
@@ -1109,21 +1113,27 @@ function TickField() {
 		let boxCollision = boxes.some(otherBox => 
             otherBox !== box && otherBox.x === mBoxX * TILESIZE && otherBox.y === mBoxY * TILESIZE
         );
+		const boxWasBlocked = mBoxMap00 > 79 || mBoxMap01 > 79 || mBoxSprite !== 0 || boxCollision;
+		const boxAttempted = box.moveX !== 0 || box.moveY !== 0;
+		const directionalInput = gKey[37] || gKey[38] || gKey[39] || gKey[40];
 
         if (mBoxMap00 > 79 || mBoxMap01 > 79 || mBoxSprite !== 0 || boxCollision) { // 障害物または他のボックスがある場合
             box.moveX = 0;
             box.moveY = 0;
         }
 
-		if(box.moveX === -TILESIZE || box.moveY === -TILESIZE || box.moveX === TILESIZE || box.moveY === TILESIZE) {
-			PlaySoundDraggingBox();
-		}
-
         // ボックスの移動を更新
-        box.x += Math.sign(box.moveX) * (SCROLL / 2);
-        box.y += Math.sign(box.moveY) * (SCROLL / 2);
-        box.moveX -= Math.sign(box.moveX) * (SCROLL / 2);
-        box.moveY -= Math.sign(box.moveY) * (SCROLL / 2);
+        if (boxWasBlocked || (box.pushLocked && box.moveX === 0 && box.moveY === 0 && directionalInput)) blockedMovement = true;
+        if (!gKey[37] && !gKey[38] && !gKey[39] && !gKey[40]) box.pushLocked = false;
+        if (boxWasBlocked) box.soundPending = false;
+        if (!boxWasBlocked && box.soundPending) { PlaySoundDraggingBox(); box.soundPending = false; }
+        const boxStepX = Math.min(SCROLL, Math.abs(box.moveX));
+        const boxStepY = Math.min(SCROLL, Math.abs(box.moveY));
+        box.x += Math.sign(box.moveX) * boxStepX;
+        box.y += Math.sign(box.moveY) * boxStepY;
+        box.moveX -= Math.sign(box.moveX) * boxStepX;
+        box.moveY -= Math.sign(box.moveY) * boxStepY;
+		if (!boxWasBlocked && box.moveX === 0 && box.moveY === 0 && directionalInput) box.pushLocked = false;
     }
 
     // クリア処理
@@ -1289,3 +1299,6 @@ window.onload = async function () {
 
     setInterval(WmTimer, 33); // ゲームループ開始（約30fps）
 };
+
+
+
